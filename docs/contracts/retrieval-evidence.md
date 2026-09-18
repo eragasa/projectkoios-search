@@ -1,24 +1,11 @@
-# Source-linked retrieval evidence contract
-
-## Contract metadata
-
-| Field | Value |
-|---|---|
-| Contract ID | `projectkoios.search.retrieval-evidence` |
-| Owner | `projectkoios-search` |
-| Status | Proposed |
-| Contract version | Unassigned |
-| Architecture record | [`ADR20260918`](https://github.com/eragasa/projectkoios/blob/main/docs/adr.20260918.evidence-grounded-scientific-rag.md) |
-| Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
-| Supersedes | `TextChunk` and `ChunkSearchResult` only after separate acceptance and migration |
-| Consumers | Search lanes, `projectkoios-api`, `projectkoios-agent` |
+# Source-linked retrieval evidence contract suite
 
 ## Status
 
-Proposed under
+Both contracts in this suite are proposed under
 [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1).
-This planning contract does not authorize implementation, corpus publication,
-embedding generation, or answer generation.
+This suite does not authorize implementation, corpus publication, embedding
+generation, or answer generation.
 
 ## Purpose
 
@@ -53,16 +40,60 @@ silently become retrievable source evidence.
 
 ## Contract layers
 
-The contract separates:
+The suite separates:
 
-1. source evidence references;
-2. retrievable evidence units;
-3. lane-specific retrieval observations;
-4. deterministic fusion observations; and
-5. bounded evidence bundles.
+1. `projectkoios.search.evidence-unit`, covering source references, retrievable
+   evidence units, identity, candidate status, and equation evidence; and
+2. `projectkoios.search.evidence-bundle`, covering lane observations, fusion,
+   bounded bundles, outcome semantics, citation resolution, and external
+   serialization.
 
 A layer may refer to an earlier layer by immutable identity. It may not copy
 and alter source content without a separately identified derivation.
+
+## Normative scope and conformance
+
+The **Source evidence reference**, **Evidence units**, **Deterministic
+identity**, **Candidate and accepted status**, and **Equation evidence**
+sections are normative for `projectkoios.search.evidence-unit`. The **Lane
+observations**, **Fusion observations**, **Evidence bundle**, **Outcome
+semantics**, **Citation resolution**, and **Serialization boundary** sections
+are normative for `projectkoios.search.evidence-bundle`. Source-boundary and
+untrusted-content restrictions apply to both. Purpose, rationale, and deferred
+decisions are informative.
+
+Evidence-unit conformance subjects are unit producers, index builders, and
+source resolvers. Evidence-bundle conformance subjects are retrieval services,
+bundle serializers and parsers, citation-resolution clients, and generation
+clients that consume bundles. Every conformance claim MUST identify contract
+ID, target or accepted version, exact specification commit, implementation
+commit, corpus or fixture identity, and validation result.
+
+Existing lowercase requirements in the named normative sections express
+requirements for these proposed contracts. Before acceptance, they MUST be
+converted to the shared capitalized normative vocabulary or mapped explicitly
+to conformance tests. Unresolved conceptual outcome names and bounds block
+acceptance when they affect observable behavior.
+
+## Contract metadata: evidence unit
+
+| Field | Value |
+|---|---|
+| Contract ID | `projectkoios.search.evidence-unit` |
+| Target version | `0.1.0` |
+| Status | Proposed |
+| Specification revision | Git commit containing this document |
+| Owner | `projectkoios-search` |
+| Acceptance authority | Project Koios operator after search-owner and materially affected producer/consumer review |
+| Architecture record | [`ADR20260918`](https://github.com/eragasa/projectkoios/blob/main/docs/adr.20260918.evidence-grounded-scientific-rag.md) |
+| Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
+| Predecessor | None registered |
+| Supersedes | None while proposed |
+| Dependencies | `projectkoios.ingestion.clean-transcript@0.1.0`; `projectkoios.references.candidate-manifest@0.1.0` |
+| Consumers | Search index builders and lanes; `projectkoios.search.evidence-bundle` |
+| Implementation bindings | Existing `TextChunk` is a prototype and is not superseded by proposal publication |
+| Compatibility | Breaking migration from the current prototype; no accepted predecessor contract exists |
+| Effective baseline | None while proposed |
 
 ## Source evidence reference
 
@@ -125,6 +156,26 @@ required to reproduce the index.
 A changed source, candidate status, warning policy, chunking decision, or
 processor version produces a new identity. Existing immutable indexes are not
 silently updated in place.
+
+## Contract metadata: evidence bundle
+
+| Field | Value |
+|---|---|
+| Contract ID | `projectkoios.search.evidence-bundle` |
+| Target version | `0.1.0` |
+| Status | Proposed |
+| Specification revision | Git commit containing this document |
+| Owner | `projectkoios-search` |
+| Acceptance authority | Project Koios operator after search-owner and materially affected API/agent consumer review |
+| Architecture record | [`ADR20260918`](https://github.com/eragasa/projectkoios/blob/main/docs/adr.20260918.evidence-grounded-scientific-rag.md) |
+| Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
+| Predecessor | None registered |
+| Supersedes | None while proposed |
+| Dependencies | `projectkoios.search.evidence-unit@0.1.0` |
+| Consumers | `projectkoios-api`, `projectkoios-agent`, retrieval evaluation clients |
+| Implementation bindings | Existing `ChunkSearchResult` is a prototype and is not superseded by proposal publication |
+| Compatibility | Breaking migration from the current prototype; no accepted predecessor contract exists |
+| Effective baseline | None while proposed |
 
 ## Lane observations
 
