@@ -1,5 +1,18 @@
 # Source-linked retrieval evidence contract
 
+## Contract metadata
+
+| Field | Value |
+|---|---|
+| Contract ID | `projectkoios.search.retrieval-evidence` |
+| Owner | `projectkoios-search` |
+| Status | Proposed |
+| Contract version | Unassigned |
+| Architecture record | [`ADR20260918`](https://github.com/eragasa/projectkoios/blob/main/docs/adr.20260918.evidence-grounded-scientific-rag.md) |
+| Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
+| Supersedes | `TextChunk` and `ChunkSearchResult` only after separate acceptance and migration |
+| Consumers | Search lanes, `projectkoios-api`, `projectkoios-agent` |
+
 ## Status
 
 Proposed under
