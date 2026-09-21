@@ -117,6 +117,28 @@ as the sole identity.
 
 Missing, contradictory, or unresolvable required identities fail closed.
 
+## Retrieval purpose and admission
+
+Every role-scoped retrieval request declares one explicit purpose. Corpus
+content roles and purpose admission are separate: each record declares its
+admitted purposes, while a policy independently bounds which roles each purpose
+may consume. Both checks must pass. Callers cannot supply an ad-hoc role
+allowlist, and an index cannot infer a purpose from query text. Unsupported
+purposes and records lacking explicit admission fail closed without fallback to
+another purpose.
+
+The extracted course-material policy admits only `theory_evidence` for
+`problem_solving`, `citation_evidence`, and `ordinary_rag`. The
+`lecture_authoring` purpose additionally admits `source_worked_example` and
+`reviewed_solution`. It never admits problem material, source solutions, or
+generated solutions. Literature review continues through its reference-only
+boundary and is not silently mapped onto the course-material policy.
+
+A page or chunk containing a worked example is not theory evidence merely
+because it also contains explanatory prose. Conservative producers may classify
+the entire mixed unit as `source_worked_example`; finer splitting requires a
+separately validated source-boundary projection.
+
 ## Evidence units
 
 Every evidence unit has:
