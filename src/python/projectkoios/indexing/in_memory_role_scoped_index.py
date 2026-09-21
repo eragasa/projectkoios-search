@@ -6,6 +6,7 @@ from collections import Counter
 from collections.abc import Iterable
 
 from projectkoios.search.models import (
+    RoleAdmissionPolicy,
     RoleScopedChunk,
     RoleScopedChunkSearchResult,
     RoleScopedSearchRequest,
@@ -15,7 +16,8 @@ from projectkoios.search.models import (
 class InMemoryRoleScopedChunkIndex:
     """Small deterministic BM25 index with explicit corpus roles."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, admission_policy: RoleAdmissionPolicy) -> None:
+        self._admission_policy = admission_policy
         self._records: dict[str, RoleScopedChunk] = {}
 
     def add_records(self, records: Iterable[RoleScopedChunk]) -> None:
@@ -33,12 +35,15 @@ class InMemoryRoleScopedChunkIndex:
         request: RoleScopedSearchRequest,
     ) -> tuple[RoleScopedChunkSearchResult, ...]:
         terms = tuple(dict.fromkeys(self._terms(request.query)))
-        allowed = set(request.allowed_roles)
+        allowed = set(
+            self._admission_policy.admitted_roles_for(request.purpose)
+        )
         excluded = set(request.excluded_record_ids)
         admitted = tuple(
             record
             for record in self._records.values()
             if record.corpus_role in allowed
+            and request.purpose in record.admitted_purposes
             and record.record_id not in excluded
         )
         document_terms = {

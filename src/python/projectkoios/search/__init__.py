@@ -8,15 +8,19 @@ from projectkoios.search.literature import (
     LiteratureEvidenceBundleService,
     LiteratureEvidenceItem,
     PurposeScopedEvidenceIndex,
-    RetrievalPurpose,
     SqliteFtsReferenceEvidenceIndex,
 )
 from projectkoios.search.models import (
     ChunkSearchResult,
     CorpusRole,
+    PurposeAdmission,
+    RetrievalPurpose,
+    RoleAdmissionPolicy,
     RoleScopedChunk,
     RoleScopedChunkSearchResult,
     RoleScopedSearchRequest,
+    UnsupportedRetrievalPurposeError,
+    course_material_admission_policy,
 )
 from projectkoios.search.protocols import (
     ChunkSearchIndex,
@@ -36,8 +40,10 @@ __all__ = [
     "LiteratureEvidenceBundle",
     "LiteratureEvidenceBundleService",
     "LiteratureEvidenceItem",
+    "PurposeAdmission",
     "PurposeScopedEvidenceIndex",
     "RetrievalPurpose",
+    "RoleAdmissionPolicy",
     "RoleScopedChunk",
     "RoleScopedChunkSearchIndex",
     "RoleScopedChunkSearchResult",
@@ -45,4 +51,6 @@ __all__ = [
     "RoleScopedSearchService",
     "SearchService",
     "SqliteFtsReferenceEvidenceIndex",
+    "UnsupportedRetrievalPurposeError",
+    "course_material_admission_policy",
 ]

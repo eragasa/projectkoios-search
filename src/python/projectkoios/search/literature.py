@@ -8,11 +8,9 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Protocol
 
+from projectkoios.search.models import RetrievalPurpose
+
 _QUERY_TERM = re.compile(r"[^\W_]+", re.UNICODE)
-
-
-class RetrievalPurpose(StrEnum):
-    LITERATURE_REVIEW = "literature_review"
 
 
 class EvidenceCorpusRole(StrEnum):
