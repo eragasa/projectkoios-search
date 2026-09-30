@@ -8,6 +8,10 @@ classDiagram
     class DataObjectActionizer
     class EvidenceWarning
     class EvidenceItem
+    class EvidenceCorpus
+    class EvidenceCorpusCompositionRequest
+    class EvidenceCorpusCompositionResult
+    class EvidenceCorpusComposer
     class EvidenceRetrievalRequest
     class RankedEvidenceItem
     class EvidenceRetrievalResult
@@ -15,11 +19,22 @@ classDiagram
 
     DataObjectModel <|-- EvidenceWarning
     DataObjectModel <|-- EvidenceItem
+    DataObjectModel <|-- EvidenceCorpus
+    DataObjectActionRequest <|-- EvidenceCorpusCompositionRequest
+    DataObjectActionResult <|-- EvidenceCorpusCompositionResult
+    DataObjectActionizer <|-- EvidenceCorpusComposer
     DataObjectActionRequest <|-- EvidenceRetrievalRequest
     DataObjectModel <|-- RankedEvidenceItem
     DataObjectActionResult <|-- EvidenceRetrievalResult
     DataObjectActionizer <|-- DeterministicLexicalEvidenceRetriever
     EvidenceItem *-- EvidenceWarning
+    EvidenceCorpus *-- EvidenceItem
+    EvidenceCorpusCompositionRequest *-- EvidenceItem
+    EvidenceCorpusCompositionResult *-- EvidenceCorpusCompositionRequest
+    EvidenceCorpusCompositionResult *-- EvidenceCorpus
+    EvidenceCorpusComposer --> EvidenceCorpusCompositionRequest : action / compose
+    EvidenceCorpusComposer --> EvidenceCorpusCompositionResult : returns
+    DeterministicLexicalEvidenceRetriever o-- EvidenceCorpus : bound corpus
     RankedEvidenceItem *-- EvidenceItem
     EvidenceRetrievalResult *-- EvidenceRetrievalRequest
     EvidenceRetrievalResult *-- RankedEvidenceItem
@@ -28,4 +43,4 @@ classDiagram
 ```
 
 Every represented value is frozen, slotted, keyword-only, and identity-bearing.
-The performer is function-like and is not a DataObject.
+The composer and retriever are function-like performers rather than DataObjects.

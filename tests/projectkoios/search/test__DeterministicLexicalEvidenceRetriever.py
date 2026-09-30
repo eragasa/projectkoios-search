@@ -14,6 +14,10 @@ from projectkoios.search import (
     AuthoringCorpusRole,
     AuthoringPurpose,
     DeterministicLexicalEvidenceRetriever,
+    EvidenceCorpus,
+    EvidenceCorpusComposer,
+    EvidenceCorpusCompositionRequest,
+    EvidenceCorpusCompositionResult,
     EvidenceItem,
     EvidenceRetrievalOutcome,
     EvidenceRetrievalRequest,
@@ -83,14 +87,26 @@ def _query(
     )
 
 
-def _retriever(
-    *items: EvidenceItem,
-    corpus_id: str = "corpus:authoring:test",
-) -> DeterministicLexicalEvidenceRetriever:
-    return DeterministicLexicalEvidenceRetriever(
-        corpus_id=corpus_id,
+def _corpus(*items: EvidenceItem) -> EvidenceCorpus:
+    return EvidenceCorpus(
+        admitted_role=AuthoringCorpusRole.REFERENCE_EVIDENCE,
         items=tuple(items),
     )
+
+
+def _composition_request(
+    *items: EvidenceItem,
+) -> EvidenceCorpusCompositionRequest:
+    return EvidenceCorpusCompositionRequest(
+        admitted_role=AuthoringCorpusRole.REFERENCE_EVIDENCE,
+        items=tuple(items),
+    )
+
+
+def _retriever(
+    *items: EvidenceItem,
+) -> DeterministicLexicalEvidenceRetriever:
+    return DeterministicLexicalEvidenceRetriever(corpus=_corpus(*items))
 
 
 def _evidence_item_id_for(*, item: EvidenceItem) -> str:
@@ -111,6 +127,34 @@ def _evidence_item_id_for(*, item: EvidenceItem) -> str:
         retained_text=item.retained_text,
         retained_text_sha256=item.retained_text_sha256,
         warnings=item.warnings,
+    )
+
+
+def _corpus_id_for(*, corpus: EvidenceCorpus) -> str:
+    return EvidenceCorpus.identity_for(
+        admitted_role=corpus.admitted_role,
+        items=corpus.items,
+    )
+
+
+def _composition_request_id_for(
+    *, request: EvidenceCorpusCompositionRequest
+) -> str:
+    return EvidenceCorpusCompositionRequest.identity_for(
+        admitted_role=request.admitted_role,
+        items=request.items,
+    )
+
+
+def _composition_result_id_for(
+    *, result: EvidenceCorpusCompositionResult
+) -> str:
+    return EvidenceCorpusCompositionResult.identity_for(
+        request=result.request,
+        composer_implementation_identity=(
+            result.composer_implementation_identity
+        ),
+        corpus=result.corpus,
     )
 
 
@@ -334,6 +378,121 @@ def test__evidence_bounds__accept_edges_and_reject_overflow() -> None:
             retained_text=(
                 "r" * (EvidenceItem.MAX_RETAINED_TEXT_CHARACTERS + 1)
             )
+        )
+
+
+def test__evidence_corpus__canonicalizes_order_and_identity() -> None:
+    first = _item(work="work:alpha", marker="a")
+    second = _item(work="work:beta", marker="b")
+
+    forward = _corpus(first, second)
+    reverse = _corpus(second, first)
+
+    assert forward == reverse
+    assert forward.items == tuple(
+        sorted((first, second), key=lambda item: item.evidence_item_id)
+    )
+    assert forward.corpus_id == _corpus_id_for(corpus=forward)
+    assert forward.corpus_id.startswith("evidence-corpus:sha256:")
+    assert not next(
+        item for item in fields(EvidenceCorpus) if item.name == "corpus_id"
+    ).init
+
+
+def test__corpus_composition_request__canonicalizes_order_and_identity() -> (
+    None
+):
+    first = _item(work="work:alpha", marker="a")
+    second = _item(work="work:beta", marker="b")
+
+    forward = _composition_request(first, second)
+    reverse = _composition_request(second, first)
+
+    assert forward == reverse
+    assert forward.items == tuple(
+        sorted((first, second), key=lambda item: item.evidence_item_id)
+    )
+    assert forward.request_id == _composition_request_id_for(request=forward)
+    assert forward.request_id.startswith(
+        "evidence-corpus-composition-request:sha256:"
+    )
+    assert not next(
+        item
+        for item in fields(EvidenceCorpusCompositionRequest)
+        if item.name == "request_id"
+    ).init
+
+
+def test__evidence_corpus__rejects_duplicate_item_identity() -> None:
+    item = _item()
+
+    with pytest.raises(ValueError, match="unique evidence item IDs"):
+        _corpus(item, item)
+    with pytest.raises(ValueError, match="unique evidence item IDs"):
+        _composition_request(item, item)
+
+
+def test__corpus_composer__action_matches_semantic_composition() -> None:
+    request = _composition_request(
+        _item(work="work:alpha", marker="a"),
+        _item(work="work:beta", marker="b"),
+    )
+    composer = EvidenceCorpusComposer()
+
+    composed = composer.compose(request=request)
+    action_result = composer.action(request=request)
+
+    assert action_result == composed
+    assert composed.request is request
+    assert composed.corpus.items == request.items
+    assert composed.corpus.admitted_role is request.admitted_role
+    assert composed.result_id == _composition_result_id_for(result=composed)
+    assert composed.result_id.startswith(
+        "evidence-corpus-composition-result:sha256:"
+    )
+    assert issubclass(EvidenceCorpus, DataObjectModel)
+    assert issubclass(
+        EvidenceCorpusCompositionRequest,
+        DataObjectActionRequest,
+    )
+    assert issubclass(
+        EvidenceCorpusCompositionResult,
+        DataObjectActionResult,
+    )
+    assert issubclass(EvidenceCorpusComposer, DataObjectActionizer)
+    assert not next(
+        item
+        for item in fields(EvidenceCorpusCompositionResult)
+        if item.name == "result_id"
+    ).init
+
+
+def test__retriever__binds_derived_corpus_and_index_identity() -> None:
+    first = _item(work="work:alpha", marker="a")
+    corpus = (
+        EvidenceCorpusComposer()
+        .compose(request=_composition_request(first))
+        .corpus
+    )
+    retriever = DeterministicLexicalEvidenceRetriever(corpus=corpus)
+
+    result = retriever.retrieve(request=_query())
+    changed = DeterministicLexicalEvidenceRetriever(
+        corpus=_corpus(first, _item(work="work:beta", marker="b"))
+    )
+
+    assert retriever.corpus is corpus
+    assert retriever.corpus_id == corpus.corpus_id
+    assert result.corpus_id == corpus.corpus_id
+    assert changed.corpus_id != retriever.corpus_id
+    assert changed.index_id != retriever.index_id
+
+
+def test__retriever__rejects_caller_supplied_corpus_identity() -> None:
+    with pytest.raises(TypeError):
+        DeterministicLexicalEvidenceRetriever(  # type: ignore[call-arg]
+            corpus_id="caller:chosen",
+            items=(_item(),),
         )
 
 
@@ -618,10 +777,3 @@ def test__result__rejects_evidence_for_nonavailable_outcome() -> None:
             available,
             outcome=EvidenceRetrievalOutcome.INSUFFICIENT_EVIDENCE,
         )
-
-
-def test__retriever__rejects_duplicate_evidence_item_id() -> None:
-    item = _item()
-
-    with pytest.raises(ValueError, match="unique evidence item IDs"):
-        _retriever(item, item)

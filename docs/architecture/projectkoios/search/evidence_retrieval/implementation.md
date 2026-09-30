@@ -1,13 +1,37 @@
 # `evidence_retrieval` implementation
 
-## Action path
+## Corpus composition
 
-`DeterministicLexicalEvidenceRetriever.action(*, request)` delegates directly
+`EvidenceCorpusCompositionRequest` validates the admitted role and exact item
+set, rejects duplicate item identities, and canonicalizes items by ascending
+`evidence_item_id`. `EvidenceCorpusComposer.action(*, request)` delegates
+directly to `compose(*, request)`, which creates the immutable `EvidenceCorpus`
+and bound `EvidenceCorpusCompositionResult`.
+
+```mermaid
+flowchart LR
+    Input["role and EvidenceItem tuple"] --> Request["EvidenceCorpusCompositionRequest"]
+    Request --> Canonical["validate and order unique item IDs"]
+    Canonical --> Compose["EvidenceCorpusComposer.compose"]
+    Compose --> Corpus["EvidenceCorpus with derived corpus_id"]
+    Corpus --> CompositionResult["EvidenceCorpusCompositionResult"]
+```
+
+The corpus admits only `REFERENCE_EVIDENCE`. Its identity binds that role and
+the canonical item identity manifest, so tuple input order cannot change corpus
+identity and callers cannot inject a corpus ID.
+
+## Retrieval action path
+
+`DeterministicLexicalEvidenceRetriever` accepts one exact `EvidenceCorpus`.
+Its `action(*, request)` delegates directly
 to `retrieve(*, request)`. There is one retrieval implementation path.
 
 ```mermaid
 flowchart LR
+    Corpus["EvidenceCorpus"] --> Retriever["DeterministicLexicalEvidenceRetriever"]
     Request["EvidenceRetrievalRequest"] --> Action["action"]
+    Retriever --> Action
     Action --> Retrieve["retrieve"]
     Retrieve --> Tokenize["bounded lexical terms"]
     Tokenize --> Score["BM25 scoring"]
@@ -52,6 +76,9 @@ omission counts and contiguous selected ranks.
 |---|---|---|
 | `EvidenceWarning` | `warning_id` | warning type, code, and detail |
 | `EvidenceItem` | `evidence_item_id` | source IDs, status, exact representations and digests, warning IDs |
+| `EvidenceCorpus` | `corpus_id` | admitted role and canonical unique evidence item IDs |
+| `EvidenceCorpusCompositionRequest` | `request_id` | request type, admitted role, and canonical item IDs |
+| `EvidenceCorpusCompositionResult` | `result_id` | request ID, composer implementation identity, and corpus ID |
 | `EvidenceRetrievalRequest` | `request_id` | purpose, query, opaque target ID, work IDs, and bounds |
 | `RankedEvidenceItem` | `ranked_evidence_item_id` | evidence item ID, exact float score, rank, matched terms, and tie key |
 | `EvidenceRetrievalResult` | `result_id` | request ID, retriever implementation identity, corpus/index IDs, outcome, ranked IDs, omissions, and warnings |

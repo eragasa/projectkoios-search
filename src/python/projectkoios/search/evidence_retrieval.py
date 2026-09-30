@@ -22,10 +22,14 @@ __all__: tuple[str, ...] = (
     "AuthoringCorpusRole",
     "AuthoringPurpose",
     "DeterministicLexicalEvidenceRetriever",
-    "EvidenceRetrievalResult",
+    "EvidenceCorpus",
+    "EvidenceCorpusComposer",
+    "EvidenceCorpusCompositionRequest",
+    "EvidenceCorpusCompositionResult",
     "EvidenceItem",
-    "EvidenceRetrievalRequest",
     "EvidenceRetrievalOutcome",
+    "EvidenceRetrievalRequest",
+    "EvidenceRetrievalResult",
     "EvidenceWarning",
     "RankedEvidenceItem",
     "ReferenceIdentityStatus",
@@ -386,6 +390,258 @@ class EvidenceItem(DataObjectModel):
         expected: str = hashlib.sha256(value.encode("utf-8")).hexdigest()
         if digest != expected:
             raise ValueError(f"{label} digest does not match its text")
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EvidenceCorpus(DataObjectModel):
+    """Represent one canonical immutable corpus of admitted evidence."""
+
+    admitted_role: AuthoringCorpusRole
+    items: tuple[EvidenceItem, ...]
+    corpus_id: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if self.admitted_role is not AuthoringCorpusRole.REFERENCE_EVIDENCE:
+            raise ValueError(
+                "authoring corpus must admit the reference_evidence role"
+            )
+        ordered_items: tuple[EvidenceItem, ...] = self._canonical_items(
+            admitted_role=self.admitted_role,
+            items=self.items,
+        )
+        object.__setattr__(self, "items", ordered_items)
+        object.__setattr__(
+            self,
+            "corpus_id",
+            self.identity_for(
+                admitted_role=self.admitted_role,
+                items=ordered_items,
+            ),
+        )
+
+    @staticmethod
+    def identity_for(
+        *,
+        admitted_role: AuthoringCorpusRole,
+        items: tuple[EvidenceItem, ...],
+    ) -> str:
+        """Return the identity of one admitted, canonically ordered corpus."""
+
+        payload: dict[str, object] = {
+            "admitted_role": admitted_role.value,
+            "corpus_type": "projectkoios.search.evidence-corpus",
+            "evidence_item_ids": tuple(
+                sorted(item.evidence_item_id for item in items)
+            ),
+        }
+        canonical: bytes = json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        digest: str = hashlib.sha256(canonical).hexdigest()
+        return f"evidence-corpus:sha256:{digest}"
+
+    @staticmethod
+    def _canonical_items(
+        *,
+        admitted_role: AuthoringCorpusRole,
+        items: tuple[EvidenceItem, ...],
+    ) -> tuple[EvidenceItem, ...]:
+        if not isinstance(items, tuple):
+            raise ValueError("evidence corpus items must be an immutable tuple")
+        if any(type(item) is not EvidenceItem for item in items):
+            raise TypeError("evidence corpus items must be EvidenceItem values")
+        if any(item.corpus_role is not admitted_role for item in items):
+            raise ValueError(
+                "evidence items must match the admitted corpus role"
+            )
+        evidence_item_ids: tuple[str, ...] = tuple(
+            item.evidence_item_id for item in items
+        )
+        if len(set(evidence_item_ids)) != len(evidence_item_ids):
+            raise ValueError(
+                "evidence items must have unique evidence item IDs"
+            )
+        return tuple(sorted(items, key=lambda item: item.evidence_item_id))
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EvidenceCorpusCompositionRequest(DataObjectActionRequest):
+    """Request deterministic composition of one admitted evidence corpus."""
+
+    admitted_role: AuthoringCorpusRole
+    items: tuple[EvidenceItem, ...]
+    request_id: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if self.admitted_role is not AuthoringCorpusRole.REFERENCE_EVIDENCE:
+            raise ValueError(
+                "corpus composition must admit the reference_evidence role"
+            )
+        ordered_items: tuple[EvidenceItem, ...] = (
+            EvidenceCorpus._canonical_items(
+                admitted_role=self.admitted_role,
+                items=self.items,
+            )
+        )
+        object.__setattr__(self, "items", ordered_items)
+        object.__setattr__(
+            self,
+            "request_id",
+            self.identity_for(
+                admitted_role=self.admitted_role,
+                items=ordered_items,
+            ),
+        )
+
+    @staticmethod
+    def identity_for(
+        *,
+        admitted_role: AuthoringCorpusRole,
+        items: tuple[EvidenceItem, ...],
+    ) -> str:
+        """Return the identity of exact canonical composition intent."""
+
+        payload: dict[str, object] = {
+            "admitted_role": admitted_role.value,
+            "evidence_item_ids": tuple(
+                sorted(item.evidence_item_id for item in items)
+            ),
+            "request_type": (
+                "projectkoios.search.evidence-corpus-composition-request"
+            ),
+        }
+        canonical: bytes = json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        digest: str = hashlib.sha256(canonical).hexdigest()
+        return f"evidence-corpus-composition-request:sha256:{digest}"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class EvidenceCorpusCompositionResult(DataObjectActionResult):
+    """Bind one composition request to its exact derived corpus."""
+
+    request: EvidenceCorpusCompositionRequest
+    composer_implementation_identity: str
+    corpus: EvidenceCorpus
+    result_id: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if type(self.request) is not EvidenceCorpusCompositionRequest:
+            raise TypeError(
+                "request must be an EvidenceCorpusCompositionRequest"
+            )
+        if (
+            not isinstance(self.composer_implementation_identity, str)
+            or not self.composer_implementation_identity.strip()
+            or self.composer_implementation_identity
+            != self.composer_implementation_identity.strip()
+            or len(self.composer_implementation_identity)
+            > EvidenceItem.MAX_ID_CHARACTERS
+        ):
+            raise ValueError(
+                "composer implementation ID must contain 1 to 512 "
+                "trimmed characters"
+            )
+        if type(self.corpus) is not EvidenceCorpus:
+            raise TypeError("corpus must be an EvidenceCorpus")
+        if (
+            self.corpus.admitted_role is not self.request.admitted_role
+            or self.corpus.items != self.request.items
+        ):
+            raise ValueError(
+                "composed corpus must exactly represent the request"
+            )
+        object.__setattr__(
+            self,
+            "result_id",
+            self.identity_for(
+                request=self.request,
+                composer_implementation_identity=(
+                    self.composer_implementation_identity
+                ),
+                corpus=self.corpus,
+            ),
+        )
+
+    @staticmethod
+    def identity_for(
+        *,
+        request: EvidenceCorpusCompositionRequest,
+        composer_implementation_identity: str,
+        corpus: EvidenceCorpus,
+    ) -> str:
+        """Return the identity binding composition intent and output."""
+
+        payload: dict[str, str] = {
+            "composer_implementation_identity": (
+                composer_implementation_identity
+            ),
+            "corpus_id": corpus.corpus_id,
+            "request_id": request.request_id,
+            "result_type": (
+                "projectkoios.search.evidence-corpus-composition-result"
+            ),
+        }
+        canonical: bytes = json.dumps(
+            payload,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+        digest: str = hashlib.sha256(canonical).hexdigest()
+        return f"evidence-corpus-composition-result:sha256:{digest}"
+
+
+class EvidenceCorpusComposer(
+    DataObjectActionizer[
+        EvidenceCorpusCompositionRequest,
+        EvidenceCorpusCompositionResult,
+    ]
+):
+    """Compose one canonical evidence corpus through a semantic action."""
+
+    __slots__ = ()
+
+    IMPLEMENTATION_IDENTITY: ClassVar[str] = (
+        "projectkoios.search.evidence-corpus-composer"
+    )
+
+    def action(
+        self,
+        *,
+        request: EvidenceCorpusCompositionRequest,
+    ) -> EvidenceCorpusCompositionResult:
+        """Return the result of the semantic composition method."""
+
+        return self.compose(request=request)
+
+    def compose(
+        self,
+        *,
+        request: EvidenceCorpusCompositionRequest,
+    ) -> EvidenceCorpusCompositionResult:
+        """Compose the request's canonical immutable corpus."""
+
+        if type(request) is not EvidenceCorpusCompositionRequest:
+            raise TypeError(
+                "request must be an EvidenceCorpusCompositionRequest"
+            )
+        corpus = EvidenceCorpus(
+            admitted_role=request.admitted_role,
+            items=request.items,
+        )
+        return EvidenceCorpusCompositionResult(
+            request=request,
+            composer_implementation_identity=self.IMPLEMENTATION_IDENTITY,
+            corpus=corpus,
+        )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -958,7 +1214,7 @@ class DeterministicLexicalEvidenceRetriever(
 ):
     """Retrieve bounded reference evidence with deterministic lexical BM25."""
 
-    __slots__ = ("_corpus_id", "_index_id", "_items")
+    __slots__ = ("_corpus", "_index_id")
 
     TERM_PATTERN: ClassVar[re.Pattern[str]] = re.compile(
         r"[^\W_]+(?:[.-][^\W_]+)*",
@@ -970,42 +1226,23 @@ class DeterministicLexicalEvidenceRetriever(
         "projectkoios.search.deterministic-lexical-evidence-retriever"
     )
 
-    def __init__(
-        self,
-        *,
-        corpus_id: str,
-        items: tuple[EvidenceItem, ...],
-    ) -> None:
-        self._validate_id(
-            value=corpus_id,
-            label="corpus ID",
-        )
-        if not isinstance(items, tuple):
-            raise ValueError("retriever items must be an immutable tuple")
-        if any(type(item) is not EvidenceItem for item in items):
-            raise TypeError("items must be an EvidenceItem tuple")
-        evidence_item_ids: tuple[str, ...] = tuple(
-            item.evidence_item_id for item in items
-        )
-        if len(set(evidence_item_ids)) != len(evidence_item_ids):
-            raise ValueError(
-                "retriever items must have unique evidence item IDs"
-            )
-        ordered_items: tuple[EvidenceItem, ...] = tuple(
-            sorted(items, key=lambda item: item.evidence_item_id)
-        )
-        self._corpus_id = corpus_id
-        self._items = ordered_items
-        self._index_id = self._derive_index_id(
-            corpus_id=corpus_id,
-            items=ordered_items,
-        )
+    def __init__(self, *, corpus: EvidenceCorpus) -> None:
+        if type(corpus) is not EvidenceCorpus:
+            raise TypeError("corpus must be an EvidenceCorpus")
+        self._corpus = corpus
+        self._index_id = self._derive_index_id(corpus=corpus)
+
+    @property
+    def corpus(self) -> EvidenceCorpus:
+        """Return the exact immutable corpus bound to this retriever."""
+
+        return self._corpus
 
     @property
     def corpus_id(self) -> str:
-        """Return the exact admitted-corpus identity."""
+        """Return the identity derived by the bound evidence corpus."""
 
-        return self._corpus_id
+        return self._corpus.corpus_id
 
     @property
     def index_id(self) -> str:
@@ -1163,7 +1400,7 @@ class DeterministicLexicalEvidenceRetriever(
     ) -> tuple[tuple[EvidenceItem, float, tuple[str, ...]], ...]:
         eligible: tuple[EvidenceItem, ...] = tuple(
             item
-            for item in self._items
+            for item in self._corpus.items
             if not request.bibliographic_work_ids
             or item.bibliographic_work_id in request.bibliographic_work_ids
         )
@@ -1356,17 +1593,14 @@ class DeterministicLexicalEvidenceRetriever(
         )
 
     @classmethod
-    def _derive_index_id(
-        cls,
-        *,
-        corpus_id: str,
-        items: tuple[EvidenceItem, ...],
-    ) -> str:
+    def _derive_index_id(cls, *, corpus: EvidenceCorpus) -> str:
         payload: dict[str, object] = {
             "bm25_b": cls.BM25_B,
             "bm25_k1": cls.BM25_K1,
-            "corpus_id": corpus_id,
-            "evidence_item_ids": tuple(item.evidence_item_id for item in items),
+            "corpus_id": corpus.corpus_id,
+            "evidence_item_ids": tuple(
+                item.evidence_item_id for item in corpus.items
+            ),
             "implementation_identity": cls.IMPLEMENTATION_IDENTITY,
             "term_pattern": cls.TERM_PATTERN.pattern,
         }
@@ -1378,17 +1612,3 @@ class DeterministicLexicalEvidenceRetriever(
         ).encode("utf-8")
         digest: str = hashlib.sha256(encoded).hexdigest()
         return f"authoring-lexical-index:sha256:{digest}"
-
-    @staticmethod
-    def _validate_id(*, value: str, label: str) -> None:
-        if (
-            not isinstance(value, str)
-            or not value.strip()
-            or value != value.strip()
-            or len(value) > EvidenceRetrievalRequest.MAX_ID_CHARACTERS
-        ):
-            raise ValueError(
-                f"{label} must contain 1 to "
-                f"{EvidenceRetrievalRequest.MAX_ID_CHARACTERS} "
-                "trimmed characters"
-            )

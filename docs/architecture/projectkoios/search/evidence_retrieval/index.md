@@ -4,7 +4,8 @@
 
 This module owns the bounded text-only evidence family for the first
 `manuscript_authoring` lexical slice. It contains immutable source-linked
-records and one semantic performer. Its implementation does not accept the
+records, deterministic corpus composition, and lexical retrieval performers.
+Its implementation does not accept the
 broader [proposed retrieval contracts](../../../../contracts/README.md).
 It does not contain target bytes,
 generated/course/manuscript evidence, rights decisions, persistence, vectors,
@@ -20,6 +21,10 @@ implementation architecture.
 - [`AuthoringCorpusRole`](AuthoringCorpusRole/index.md)
 - [`AuthoringPurpose`](AuthoringPurpose/index.md)
 - [`DeterministicLexicalEvidenceRetriever`](DeterministicLexicalEvidenceRetriever/index.md)
+- [`EvidenceCorpus`](EvidenceCorpus/index.md)
+- [`EvidenceCorpusComposer`](EvidenceCorpusComposer/index.md)
+- [`EvidenceCorpusCompositionRequest`](EvidenceCorpusCompositionRequest/index.md)
+- [`EvidenceCorpusCompositionResult`](EvidenceCorpusCompositionResult/index.md)
 - [`EvidenceItem`](EvidenceItem/index.md)
 - [`EvidenceRetrievalOutcome`](EvidenceRetrievalOutcome/index.md)
 - [`EvidenceRetrievalRequest`](EvidenceRetrievalRequest/index.md)
