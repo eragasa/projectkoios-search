@@ -5,11 +5,13 @@
 Both contracts in this suite are proposed under
 [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1).
 This suite does not authorize implementation, corpus publication, embedding
-generation, answer generation, or contract acceptance.
+generation, answer generation, or contract acceptance. The narrower implemented
+family is documented separately in the
+[Search-owned `evidence_retrieval` architecture](../architecture/projectkoios/search/evidence_retrieval/index.md).
 
 The central decision record formerly linked from this proposal has been
 deleted and is not architecture authority. The commit-pinned Project Koios
-[evidence-grounded long-form authoring architecture](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring)
+[evidence-grounded long-form authoring architecture](https://github.com/eragasa/projectkoios/blob/d8a4867d581af81b76d10685b295df2abd1d632e/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring)
 governs the bounded prototype direction without accepting these contracts.
 
 ## Purpose
@@ -90,7 +92,7 @@ acceptance when they affect observable behavior.
 | Specification revision | Git commit containing this document |
 | Owner | `projectkoios-search` |
 | Acceptance authority | Project Koios operator after search-owner and materially affected producer/consumer review |
-| Architecture record | [Evidence-grounded long-form authoring](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring) |
+| Architecture record | [Evidence-grounded long-form authoring](https://github.com/eragasa/projectkoios/blob/d8a4867d581af81b76d10685b295df2abd1d632e/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring) |
 | Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
 | Predecessor | None registered |
 | Supersedes | None while proposed |
@@ -194,7 +196,7 @@ silently updated in place.
 | Specification revision | Git commit containing this document |
 | Owner | `projectkoios-search` |
 | Acceptance authority | Project Koios operator after search-owner and materially affected API/agent consumer review |
-| Architecture record | [Evidence-grounded long-form authoring](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring) |
+| Architecture record | [Evidence-grounded long-form authoring](https://github.com/eragasa/projectkoios/blob/d8a4867d581af81b76d10685b295df2abd1d632e/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring) |
 | Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
 | Predecessor | None registered |
 | Supersedes | None while proposed |
@@ -245,7 +247,8 @@ lane evidence as a negative scientific judgment.
 
 ## Evidence bundle
 
-An `EvidenceBundle` is the bounded output of search. It contains at least:
+An evidence bundle is the proposed bounded output of the broader contract. It
+contains at least:
 
 - bundle and query identity;
 - original query and explicitly recorded normalization;

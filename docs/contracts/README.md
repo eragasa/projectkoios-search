@@ -1,7 +1,10 @@
 # Search contracts
 
 This directory indexes owner-local contract proposals maintained by
-`projectkoios-search`. Neither listed proposal has an accepted baseline.
+`projectkoios-search`. Neither listed proposal has an accepted baseline. The
+implemented authoring family has separate
+[Search-owned implementation architecture](../architecture/projectkoios/search/evidence_retrieval/index.md);
+that implementation does not accept these broader proposals.
 
 | Contract ID | Proposal document | Scope |
 |---|---|---|
@@ -16,7 +19,7 @@ Task and recovery authority rules are defined by the
 [Project Koios task and recovery policy](https://github.com/eragasa/projectkoios/blob/main/docs/policies/task-and-recovery-records.md).
 
 The commit-pinned Project Koios
-[evidence-grounded long-form authoring architecture](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring)
+[evidence-grounded long-form authoring architecture](https://github.com/eragasa/projectkoios/blob/d8a4867d581af81b76d10685b295df2abd1d632e/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring)
 governs the bounded prototype direction. Deleted decision records are not
 architecture authority for these proposals.
 
