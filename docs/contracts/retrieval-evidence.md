@@ -89,7 +89,7 @@ acceptance when they affect observable behavior.
 | Specification revision | Git commit containing this document |
 | Owner | `projectkoios-search` |
 | Acceptance authority | Project Koios operator after search-owner and materially affected producer/consumer review |
-| Architecture record | None; focused living architecture is pending in `projectkoios` |
+| Architecture record | [Evidence-grounded long-form authoring](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring) |
 | Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
 | Predecessor | None registered |
 | Supersedes | None while proposed |
@@ -193,7 +193,7 @@ silently updated in place.
 | Specification revision | Git commit containing this document |
 | Owner | `projectkoios-search` |
 | Acceptance authority | Project Koios operator after search-owner and materially affected API/agent consumer review |
-| Architecture record | None; focused living architecture is pending in `projectkoios` |
+| Architecture record | [Evidence-grounded long-form authoring](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring) |
 | Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
 | Predecessor | None registered |
 | Supersedes | None while proposed |
