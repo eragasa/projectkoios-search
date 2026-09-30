@@ -1,9 +1,9 @@
 # Search contracts
 
-This directory contains stable contract proposals and accepted contracts owned
-by `projectkoios-search`.
+This directory indexes owner-local contract proposals maintained by
+`projectkoios-search`. Neither listed proposal has an accepted baseline.
 
-| Contract ID | Authoritative document | Scope |
+| Contract ID | Proposal document | Scope |
 |---|---|---|
 | `projectkoios.search.evidence-unit` | [`retrieval-evidence.md`](retrieval-evidence.md#contract-metadata-evidence-unit) | Source-linked evidence units and identity |
 | `projectkoios.search.evidence-bundle` | [`retrieval-evidence.md`](retrieval-evidence.md#contract-metadata-evidence-bundle) | Retrieval observations, fusion evidence, and bounded bundles |
@@ -15,6 +15,10 @@ Lifecycle, pre-release versioning, compatibility, and conformance follow the
 Task and recovery authority rules are defined by the
 [Project Koios task and recovery policy](https://github.com/eragasa/projectkoios/blob/main/docs/policies/task-and-recovery-records.md).
 
-The contract document itself is authoritative for status and version. This
-index does not authorize implementation, indexing, embedding generation,
-fusion, API integration, or answer generation.
+Focused living architecture for evidence-grounded authoring is pending in
+`projectkoios`. Deleted decision records are not architecture authority for
+these proposals.
+
+Each proposal document records its own status and target version. This index
+does not authorize implementation, indexing, embedding generation, fusion,
+API integration, answer generation, or contract acceptance.
