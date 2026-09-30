@@ -10,7 +10,9 @@ classDiagram
     class DataObjectActionRequest
     class DataObjectActionResult
     class DataObjectActionizer
+    class TextChunk
     class SearchPackage["projectkoios.search"]
+    class IndexingPackage["projectkoios.indexing"]
 
     DataObjectModel <|-- DataObjectActionRequest
     DataObjectModel <|-- DataObjectActionResult
@@ -18,7 +20,11 @@ classDiagram
     DataObjectActionizer --> DataObjectActionResult
     SearchPackage ..> DataObjectModel
     SearchPackage ..> DataObjectActionizer
+    SearchPackage ..> TextChunk
+    IndexingPackage ..> TextChunk
+    IndexingPackage ..> SearchPackage : models
 ```
 
 Implementation modules import shared boundaries from their owning modules.
-The namespace initializer does not contain implementation behavior.
+`projectkoios.search` and `projectkoios.indexing` use explicit initializers;
+the namespace root itself has no initializer or implementation behavior.

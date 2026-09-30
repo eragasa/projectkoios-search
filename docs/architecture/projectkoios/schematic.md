@@ -3,9 +3,16 @@
 ```mermaid
 flowchart LR
     Namespace["projectkoios namespace"] --> Search["projectkoios.search"]
-    Core["projectkoios.base"] --> Search
+    Namespace --> Indexing["projectkoios.indexing"]
+    Base["projectkoios.base"] --> Search
+    Chunking["projectkoios.chunking"] --> Search
+    Chunking --> Indexing
+    Search --> Indexing
     Search --> Consumers["explicit downstream consumers"]
+    Indexing --> Consumers
 ```
 
-`projectkoios.base` supplies the thin DataObject and DataObjectActionizer
-boundaries. Search does not acquire product authority from the namespace.
+`projectkoios.base` and `projectkoios.chunking` are shared dependency-owned
+boundaries. This repository's indexing implementations consume Search-owned
+models while both package facades remain explicit. Neither package acquires
+product authority from the namespace.

@@ -11,6 +11,7 @@ algorithms, bounds, and validation described below.
 
 ## Contents
 
-- [`search`](search/index.md) — search package implementation architecture.
+- [`indexing`](indexing/index.md) — in-memory index implementations and facade.
+- [`search`](search/index.md) — search models, protocols, services, and retrieval families.
 - [`schematic.md`](schematic.md) — namespace relationships.
 - [`implementation.md`](implementation.md) — namespace implementation rules.
