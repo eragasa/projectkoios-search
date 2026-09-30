@@ -15,9 +15,10 @@ Lifecycle, pre-release versioning, compatibility, and conformance follow the
 Task and recovery authority rules are defined by the
 [Project Koios task and recovery policy](https://github.com/eragasa/projectkoios/blob/main/docs/policies/task-and-recovery-records.md).
 
-Focused living architecture for evidence-grounded authoring is pending in
-`projectkoios`. Deleted decision records are not architecture authority for
-these proposals.
+The commit-pinned Project Koios
+[evidence-grounded long-form authoring architecture](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring)
+governs the bounded prototype direction. Deleted decision records are not
+architecture authority for these proposals.
 
 Each proposal document records its own status and target version. This index
 does not authorize implementation, indexing, embedding generation, fusion,

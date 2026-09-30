@@ -1,3 +1,15 @@
+from projectkoios.search.authoring import (
+    AuthoringCorpusRole,
+    AuthoringPurpose,
+    DeterministicLexicalEvidenceRetriever,
+    EvidenceBundle,
+    EvidenceItem,
+    EvidenceQuery,
+    EvidenceRetrievalOutcome,
+    EvidenceWarning,
+    RankedEvidence,
+    ReferenceAuthorityStatus,
+)
 from projectkoios.search.literature import (
     EvidenceCorpusRole,
     EvidencePassage,
@@ -29,12 +41,20 @@ from projectkoios.search.protocols import (
 from projectkoios.search.service import RoleScopedSearchService, SearchService
 
 __all__ = [
+    "AuthoringCorpusRole",
+    "AuthoringPurpose",
     "ChunkSearchIndex",
     "ChunkSearchResult",
+    "DeterministicLexicalEvidenceRetriever",
+    "EvidenceBundle",
     "EvidenceCorpusRole",
+    "EvidenceItem",
+    "EvidenceQuery",
+    "EvidenceRetrievalOutcome",
     "EvidencePassage",
     "EvidenceSearchRequest",
     "EvidenceSearchResult",
+    "EvidenceWarning",
     "CorpusRole",
     "LiteratureClaimQuery",
     "LiteratureEvidenceBundle",
@@ -49,6 +69,8 @@ __all__ = [
     "RoleScopedChunkSearchResult",
     "RoleScopedSearchRequest",
     "RoleScopedSearchService",
+    "RankedEvidence",
+    "ReferenceAuthorityStatus",
     "SearchService",
     "SqliteFtsReferenceEvidenceIndex",
     "UnsupportedRetrievalPurposeError",

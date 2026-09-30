@@ -8,8 +8,9 @@ This suite does not authorize implementation, corpus publication, embedding
 generation, answer generation, or contract acceptance.
 
 The central decision record formerly linked from this proposal has been
-deleted and is not architecture authority. Focused living architecture for
-evidence-grounded authoring is pending in `projectkoios`.
+deleted and is not architecture authority. The commit-pinned Project Koios
+[evidence-grounded long-form authoring architecture](https://github.com/eragasa/projectkoios/blob/ef06808d03b45df9d802ec16de24441e1bcbb8da/docs/architecture/v0/index.md#evidence-grounded-long-form-authoring)
+governs the bounded prototype direction without accepting these contracts.
 
 ## Purpose
 
