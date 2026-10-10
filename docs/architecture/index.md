@@ -11,6 +11,7 @@ keeps class pages adjacent to the module that owns them.
     - [`projectkoios.indexing.in_memory_chunk_index`](projectkoios/indexing/in_memory_chunk_index/index.md)
     - [`projectkoios.indexing.in_memory_role_scoped_index`](projectkoios/indexing/in_memory_role_scoped_index/index.md)
   - [`projectkoios.search`](projectkoios/search/index.md)
+    - [`projectkoios.search.page_projection_chunking`](projectkoios/search/page_projection_chunking/index.md)
     - [`projectkoios.search.evidence_retrieval`](projectkoios/search/evidence_retrieval/index.md)
     - [`projectkoios.search.literature`](projectkoios/search/literature/index.md)
     - [`projectkoios.search.models`](projectkoios/search/models/index.md)

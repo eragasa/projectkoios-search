@@ -1,0 +1,334 @@
+"""Semantic fixtures for current-schema page projection tests."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field, replace
+from typing import ClassVar
+
+from projectkoios.ingestion.artifact.managed.inventory import (
+    ManagedArtifactReferenceInventory,
+)
+from projectkoios.ingestion.json.canonical import CanonicalJsonSerializer
+from projectkoios.ingestion.page.projection.result import PageProjectionResult
+from projectkoios.ingestion.transcript.reading.evidence.block.equation.evidence import (  # noqa: E501
+    ReadingEquationEvidenceBlock,
+)
+from projectkoios.ingestion.transcript.reading.evidence.block.inventory import (
+    ReadingEvidenceBlockInventory,
+)
+from projectkoios.ingestion.transcript.reading.evidence.block.table.evidence import (  # noqa: E501
+    ReadingTableEvidenceBlock,
+)
+from projectkoios.ingestion.transcript.reading.evidence.document.definition import (  # noqa: E501
+    ReadingEvidenceDocument,
+)
+from projectkoios.ingestion.transcript.reading.evidence.equation.disposition import (  # noqa: E501
+    ReadingEquationSelectionDisposition,
+)
+from projectkoios.ingestion.transcript.reading.evidence.equation.gate import (
+    ReadingEquationGate,
+)
+from projectkoios.ingestion.transcript.reading.evidence.equation.status import (
+    ReadingEquationRecognitionStatus,
+)
+from projectkoios.ingestion.transcript.reading.evidence.identity.kind import (
+    ReadingEvidenceIdentityKind,
+)
+from projectkoios.ingestion.transcript.reading.evidence.input.equation.evidence import (  # noqa: E501
+    ReadingEquationProducerEvidence,
+)
+from projectkoios.ingestion.transcript.reading.evidence.input.equation.inventory import (  # noqa: E501
+    ReadingEquationProducerEvidenceInventory,
+)
+from projectkoios.ingestion.transcript.reading.evidence.input.structure.evidence import (  # noqa: E501
+    ReadingStructuredItemProducerEvidence,
+)
+from projectkoios.ingestion.transcript.reading.evidence.input.structure.kind import (  # noqa: E501
+    ReadingStructuredItemKind,
+)
+from projectkoios.ingestion.transcript.reading.evidence.input.structure.source import (  # noqa: E501
+    ReadingSourceBlockIdentityInventory,
+)
+from projectkoios.ingestion.transcript.reading.evidence.input.table.evidence import (  # noqa: E501
+    ReadingTableProducerEvidence,
+)
+from projectkoios.ingestion.transcript.reading.evidence.input.table.inventory import (  # noqa: E501
+    ReadingTableProducerEvidenceInventory,
+)
+from projectkoios.ingestion.transcript.reading.evidence.page.evidence import (
+    ReadingEvidencePage,
+)
+from projectkoios.ingestion.transcript.reading.evidence.page.inventory import (
+    ReadingEvidencePageInventory,
+)
+from projectkoios.ingestion.transcript.reading.evidence.projection.actionizer import (  # noqa: E501
+    ReadingEvidenceProjectionActionizer,
+)
+from projectkoios.ingestion.transcript.reading.evidence.projection.identity import (  # noqa: E501
+    ReadingEvidenceProjectionIdentityDerivation,
+)
+from projectkoios.ingestion.transcript.reading.evidence.projection.result import (  # noqa: E501
+    ReadingEvidenceProjectionResult,
+)
+from projectkoios.ingestion.transcript.reading.evidence.status.review import (
+    ReadingReviewStatus,
+)
+from projectkoios.ingestion.transcript.reading.evidence.table.boundary import (
+    ReadingTableBoundaryKind,
+)
+
+from .foundation import ReadingEvidenceFoundationFixture
+from .visual_projection import ReadingVisualProjectionFixture
+
+
+@dataclass(frozen=True, slots=True)
+class PageProjectionMixedVisualFixture:
+    """Own one valid text, figure, table, and equation canonical document."""
+
+    canonical: ReadingEvidenceProjectionResult
+    foundation: ReadingEvidenceFoundationFixture
+    document: ReadingEvidenceDocument = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "document", self.derive_document())
+
+    @classmethod
+    def build(cls) -> PageProjectionMixedVisualFixture:
+        """Build one complete mixed canonical fixture."""
+        projection = ReadingVisualProjectionFixture.build()
+        canonical = ReadingEvidenceProjectionActionizer().action(
+            request=projection.request
+        )
+        return cls(
+            canonical=canonical,
+            foundation=ReadingEvidenceFoundationFixture(),
+        )
+
+    def derive_table_block(self) -> ReadingTableEvidenceBlock:
+        """Return one valid non-emittable canonical table block."""
+        page = next(iter(self.canonical.document.pages))
+        source_object_id = self.foundation.identity(
+            ReadingEvidenceIdentityKind.SOURCE_OBJECT,
+            "table",
+        )
+        item = ReadingStructuredItemProducerEvidence(
+            page_location=page.page_location,
+            order_index=2,
+            kind=ReadingStructuredItemKind.TABLE,
+            source_block_ids=ReadingSourceBlockIdentityInventory(),
+            source_object_id=source_object_id,
+            producer_id=self.foundation.identity(
+                ReadingEvidenceIdentityKind.PRODUCER,
+                "structure",
+            ),
+            producer_version="1",
+        )
+        producer = ReadingTableProducerEvidence(
+            candidate_id=self.foundation.identity(
+                ReadingEvidenceIdentityKind.CANDIDATE,
+                "table",
+            ),
+            region_id=self.foundation.identity(
+                ReadingEvidenceIdentityKind.REGION,
+                "table",
+            ),
+            boundary_kind=ReadingTableBoundaryKind.RULED,
+            lineage=self.foundation.producer_lineage(
+                source_object_id=source_object_id,
+                page=page.page_location,
+                producer_token="table",
+            ),
+            assessment=self.foundation.visual_assessment(
+                page=page.page_location
+            ),
+        )
+        return ReadingTableEvidenceBlock(
+            structured_item=item,
+            producer_evidence=producer,
+        )
+
+    def derive_equation_block(self) -> ReadingEquationEvidenceBlock:
+        """Return one valid non-emittable canonical equation block."""
+        page = next(iter(self.canonical.document.pages))
+        source_object_id = self.foundation.identity(
+            ReadingEvidenceIdentityKind.SOURCE_OBJECT,
+            "equation",
+        )
+        item = ReadingStructuredItemProducerEvidence(
+            page_location=page.page_location,
+            order_index=3,
+            kind=ReadingStructuredItemKind.EQUATION,
+            source_block_ids=ReadingSourceBlockIdentityInventory(),
+            source_object_id=source_object_id,
+            producer_id=self.foundation.identity(
+                ReadingEvidenceIdentityKind.PRODUCER,
+                "structure",
+            ),
+            producer_version="1",
+        )
+        producer = ReadingEquationProducerEvidence(
+            assembly_id=self.foundation.identity(
+                ReadingEvidenceIdentityKind.ASSEMBLY,
+                "equation",
+            ),
+            candidate_id=self.foundation.identity(
+                ReadingEvidenceIdentityKind.CANDIDATE,
+                "equation",
+            ),
+            lineage=self.foundation.producer_lineage(
+                source_object_id=source_object_id,
+                page=page.page_location,
+                producer_token="equation",
+            ),
+            native_representation="E = mc^2",
+            recognized_representation=None,
+            selection_disposition=(ReadingEquationSelectionDisposition.PRIMARY),
+            recognition_status=ReadingEquationRecognitionStatus.NOT_REQUESTED,
+            gate=ReadingEquationGate(
+                review_status=ReadingReviewStatus.UNREVIEWED,
+                accepted=False,
+                review_required=True,
+                chunk_text_eligible=False,
+            ),
+        )
+        return ReadingEquationEvidenceBlock(
+            structured_item=item,
+            producer_evidence=producer,
+        )
+
+    def derive_document(self) -> ReadingEvidenceDocument:
+        """Return the exact mixed document with synchronized lineage."""
+        document = self.canonical.document
+        page = next(iter(document.pages))
+        table_block = self.derive_table_block()
+        equation_block = self.derive_equation_block()
+        mixed_blocks = (*page.blocks, table_block, equation_block)
+        pages = ReadingEvidencePageInventory(
+            ReadingEvidencePage(
+                page_text=page.page_text,
+                blocks=ReadingEvidenceBlockInventory(*mixed_blocks),
+            )
+        )
+        tables = ReadingTableProducerEvidenceInventory(
+            table_block.producer_evidence
+        )
+        equations = ReadingEquationProducerEvidenceInventory(
+            equation_block.producer_evidence
+        )
+        references = {
+            value.artifact_id: value for value in document.managed_artifacts
+        }
+        for producer in (
+            table_block.producer_evidence,
+            equation_block.producer_evidence,
+        ):
+            for reference in producer.lineage.artifacts:
+                references[reference.artifact_id] = reference
+        managed_artifacts = ManagedArtifactReferenceInventory(
+            *sorted(references.values(), key=lambda value: value.artifact_id)
+        )
+        lineage = replace(
+            document.lineage,
+            structured_item_inventory_id=(
+                ReadingEvidenceProjectionIdentityDerivation.derive_inventory(
+                    role="structured_items",
+                    identities=[
+                        block.structured_item.record_id.value
+                        for block in mixed_blocks
+                    ],
+                )
+            ),
+            table_inventory_id=(
+                ReadingEvidenceProjectionIdentityDerivation.derive_inventory(
+                    role="tables",
+                    identities=tables.identity_material(),
+                )
+            ),
+            equation_inventory_id=(
+                ReadingEvidenceProjectionIdentityDerivation.derive_inventory(
+                    role="equations",
+                    identities=equations.identity_material(),
+                )
+            ),
+            managed_artifacts=managed_artifacts,
+        )
+        return replace(
+            document,
+            pages=pages,
+            retained_tables=tables,
+            retained_equations=equations,
+            managed_artifacts=managed_artifacts,
+            lineage=lineage,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class PageProjectionObservationFixture:
+    """Project one typed result into sanitized cross-repository evidence."""
+
+    FIXTURE_KIND: ClassVar[str] = (
+        "projectkoios.ingestion.page-projection-observation"
+    )
+    FIXTURE_SCHEMA: ClassVar[int] = 1
+
+    result: PageProjectionResult
+
+    def __post_init__(self) -> None:
+        if type(self.result) is not PageProjectionResult:
+            raise TypeError("result must be PageProjectionResult")
+
+    def observation(self) -> dict[str, object]:
+        """Return exact evidence without defining a wire format."""
+        pages: list[dict[str, object]] = []
+        for page in self.result.pages:
+            blocks = [
+                {
+                    "block_id": block.block_id,
+                    "order_index": block.order_index,
+                    "source_id": block.source_id.value,
+                    "style": block.style.value,
+                    "text": block.text,
+                }
+                for block in page.blocks
+            ]
+            pages.append(
+                {
+                    "block_inventory_id": page.blocks.inventory_id,
+                    "blocks": blocks,
+                    "location_id": page.page_location.location_id.value,
+                    "page_id": page.page_id,
+                    "physical_page_index": page.physical_page_index,
+                    "physical_page_number": page.physical_page_number,
+                    "printed_page_label": page.printed_page_label,
+                    "projected_text_bytes": page.blocks.projected_text_bytes,
+                    "source_page_id": page.source_page_id.value,
+                }
+            )
+        result = self.result
+        return {
+            "fixture_kind": self.FIXTURE_KIND,
+            "fixture_schema": self.FIXTURE_SCHEMA,
+            "page_projection_result": {
+                "artifact_verification_result_id": (
+                    result.artifact_verification_result_id
+                ),
+                "contract_name": result.CONTRACT_NAME,
+                "contract_version": result.CONTRACT_VERSION,
+                "document_id": result.document_id.value,
+                "limitation_inventory_id": result.limitations.inventory_id,
+                "page_inventory_id": result.pages.inventory_id,
+                "pages": pages,
+                "processor_id": result.processor_id,
+                "processor_version": result.processor_version,
+                "projection_result_id": result.projection_result_id.value,
+                "reading_inventory_id": result.reading_inventory_id.value,
+                "request_id": result.request.request_id,
+                "result_id": result.result_id,
+                "source_id": result.source_id.value,
+                "source_result_id": result.source_result_id,
+            },
+        }
+
+    def canonical_bytes(self) -> bytes:
+        """Return compact sorted UTF-8 bytes with no terminal newline."""
+        return CanonicalJsonSerializer.serialize_bytes(self.observation())
