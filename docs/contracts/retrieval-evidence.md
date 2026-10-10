@@ -96,7 +96,7 @@ acceptance when they affect observable behavior.
 | Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
 | Predecessor | None registered |
 | Supersedes | None while proposed |
-| Dependencies | `projectkoios.ingestion.clean-transcript@0.1.0`; `projectkoios.references.candidate-manifest@0.1.0` |
+| Dependencies | Owner-internal canonical clean-transcript producer prerequisite (not a versioned cross-repository contract); `projectkoios.references.candidate-manifest@0.1.0` |
 | Consumers | Search index builders and lanes; `projectkoios.search.evidence-bundle` |
 | Implementation bindings | Existing `TextChunk` is a prototype and is not superseded by proposal publication |
 | Compatibility | Breaking migration from the current prototype; no accepted predecessor contract exists |

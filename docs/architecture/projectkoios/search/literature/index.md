@@ -5,10 +5,10 @@ service, index protocol, and read-only SQLite FTS5 adapter. It is independent
 of [`evidence_retrieval`](../evidence_retrieval/index.md) and uses the legacy
 `RetrievalPurpose.LITERATURE_REVIEW` boundary.
 
-The implementation facts formerly summarized only in the extracted candidate
-[literature evidence document](../../../../contracts/literature-evidence-retrieval.md)
-are represented by this source-mirrored architecture. Broader proposed evidence
-requirements remain in the normative sections of the
+Retrieval results remain candidate evidence. This module does not establish
+claim support, verify equations, create a human disposition, or admit evidence
+for a different retrieval purpose. Broader proposed evidence requirements
+remain in the normative sections of the
 [source-linked retrieval evidence contract](../../../../contracts/retrieval-evidence.md#normative-scope-and-conformance);
 this module does not thereby accept that proposal.
 
