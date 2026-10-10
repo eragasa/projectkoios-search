@@ -7,6 +7,7 @@ from typing import cast
 
 import mongomock
 import pytest
+from mongomock.collection import Collection as MongoMockCollection
 from projectkoios.indexing.mongodb_page_projection_lexical import (
     MongoPageProjectionLexicalError,
     MongoPageProjectionLexicalProjector,
@@ -14,6 +15,7 @@ from projectkoios.indexing.mongodb_page_projection_lexical import (
 from projectkoios.search.page_projection_lexical import (
     PageProjectionLexicalChunk,
 )
+from pymongo import IndexModel
 from pymongo.database import Database
 
 from tests.projectkoios.search.page_projection_chunking.fixture.chunking import (  # noqa: E501
@@ -83,6 +85,57 @@ def _generation_documents(
         name: tuple(database[name].find({}, sort=[("_id", 1)]))
         for name in names
     }
+
+
+def test__ensure_indexes__uses_strict_pymongo_list_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pass lists and both exact unique definitions to the driver boundary."""
+
+    observed: list[tuple[str, bool, tuple[tuple[str, object], ...]]] = []
+    original = MongoMockCollection.create_indexes
+
+    def strict_create_indexes(
+        self: MongoMockCollection,
+        indexes: list[IndexModel],
+        session: object | None = None,
+    ) -> list[str]:
+        if type(indexes) is not list:
+            raise TypeError("indexes must be a list")
+        observed.extend(
+            (
+                cast(str, index.document["name"]),
+                index.document.get("unique") is True,
+                tuple(index.document["key"].items()),
+            )
+            for index in indexes
+        )
+        return original(self, indexes, session=session)
+
+    monkeypatch.setattr(
+        MongoMockCollection,
+        "create_indexes",
+        strict_create_indexes,
+    )
+    projector = MongoPageProjectionLexicalProjector(
+        database=_database("strict-index-contract"),
+        storage_target_id="projectkoios.search.mongodb.development",
+    )
+
+    projector.ensure_indexes()
+
+    assert observed == [
+        (
+            "generation_chunk_unique",
+            True,
+            (("generation_id", 1), ("chunk_id", 1)),
+        ),
+        (
+            "generation_term_chunk_unique",
+            True,
+            (("generation_id", 1), ("term", 1), ("chunk_id", 1)),
+        ),
+    ]
 
 
 def test__stage__builds_verified_immutable_generation_idempotently() -> None:

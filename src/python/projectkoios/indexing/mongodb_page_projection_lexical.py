@@ -418,16 +418,16 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
 
         try:
             self._chunks.create_indexes(
-                (
+                [
                     IndexModel(
                         (("generation_id", ASCENDING), ("chunk_id", ASCENDING)),
                         name="generation_chunk_unique",
                         unique=True,
                     ),
-                )
+                ]
             )
             self._postings.create_indexes(
-                (
+                [
                     IndexModel(
                         (
                             ("generation_id", ASCENDING),
@@ -437,7 +437,7 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
                         name="generation_term_chunk_unique",
                         unique=True,
                     ),
-                )
+                ]
             )
             chunk_indexes = self._chunks.index_information()
             posting_indexes = self._postings.index_information()
