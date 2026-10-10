@@ -1,4 +1,16 @@
-"""Deterministic Search-owned chunks from exact page projections."""
+"""Derive deterministic Search-owned chunks from exact page projections.
+
+The module defines a deliberately narrow action boundary from Ingestion's exact
+``PageProjectionResult`` leaf to immutable Search chunks. Version 1 emits one
+chunk for every admitted projected block without joining, splitting, reordering,
+normalizing, or reaching back into retained upstream evidence.
+
+Notes
+-----
+All identities are deterministic functions of validated typed inputs. This
+module performs no persistence, indexing, retrieval, network access, model
+execution, or application-level composition.
+"""
 
 from __future__ import annotations
 
@@ -28,20 +40,57 @@ __all__: tuple[str, ...] = (
 
 
 class _PageProjectionChunkingImplementation:
-    """Own the fixed implementation identity without circular references."""
+    """Own fixed implementation identity without circular references.
+
+    Attributes
+    ----------
+    ID
+        Stable identifier for the deterministic chunker implementation.
+    VERSION
+        Version of the implemented derivation algorithm.
+    """
 
     ID: ClassVar[str] = "page-projection-chunker"
     VERSION: ClassVar[str] = "1.0"
 
 
 class _PageProjectionChunkingValidation:
-    """Validate values shared by the chunking contract family."""
+    """Validate bounded values shared by the chunking contract family.
+
+    Attributes
+    ----------
+    MAXIMUM_IDENTITY_BYTES
+        Maximum UTF-8 byte length admitted for one identity-like value.
+    MAXIMUM_TEXT_BYTES
+        Maximum UTF-8 byte length admitted for one emitted chunk.
+    """
 
     MAXIMUM_IDENTITY_BYTES: ClassVar[int] = 1_024
     MAXIMUM_TEXT_BYTES: ClassVar[int] = 262_144
 
     @classmethod
     def require_identity(cls, *, value: object, label: str) -> str:
+        """Return one validated bounded identity-like string.
+
+        Parameters
+        ----------
+        value
+            Candidate runtime value.
+        label
+            Human-readable field name used in validation errors.
+
+        Returns
+        -------
+        str
+            The unchanged nonempty UTF-8 string.
+
+        Raises
+        ------
+        ValueError
+            If the value is not a nonempty built-in string, is not valid UTF-8,
+            or exceeds the identity byte limit.
+        """
+
         return cls.require_text(
             value=value,
             label=label,
@@ -50,6 +99,28 @@ class _PageProjectionChunkingValidation:
 
     @staticmethod
     def require_nonnegative_int(*, value: object, label: str) -> int:
+        """Return one exact nonnegative built-in integer.
+
+        Parameters
+        ----------
+        value
+            Candidate runtime value.
+        label
+            Human-readable field name used in validation errors.
+
+        Returns
+        -------
+        int
+            The unchanged nonnegative integer.
+
+        Raises
+        ------
+        ValueError
+            If the value is negative or is not an exact built-in integer.
+        """
+
+        # Exact type checking intentionally rejects ``bool``, an ``int``
+        # subclass that would make order and page positions ambiguous.
         if type(value) is not int or value < 0:
             raise ValueError(f"{label} must be a nonnegative built-in integer")
         return value
@@ -61,6 +132,31 @@ class _PageProjectionChunkingValidation:
         label: str,
         maximum_bytes: int,
     ) -> str:
+        """Return one exact nonempty string within a UTF-8 byte bound.
+
+        Parameters
+        ----------
+        value
+            Candidate runtime value.
+        label
+            Human-readable field name used in validation errors.
+        maximum_bytes
+            Inclusive maximum for the strict UTF-8 representation.
+
+        Returns
+        -------
+        str
+            The unchanged validated string.
+
+        Raises
+        ------
+        ValueError
+            If the value is empty, is not an exact built-in string, cannot be
+            encoded as strict UTF-8, or exceeds ``maximum_bytes``.
+        """
+
+        # Requiring the exact built-in keeps custom string subclasses from
+        # carrying behavior that is absent from canonical identity material.
         if type(value) is not str or not value:
             raise ValueError(f"{label} must be a nonempty string")
         try:
@@ -73,10 +169,34 @@ class _PageProjectionChunkingValidation:
 
 
 class _PageProjectionChunkingIdentity:
-    """Derive bounded identities shared by the chunking contract family."""
+    """Derive canonical identities shared by the chunking contract family."""
 
     @staticmethod
     def derive(*, prefix: str, material: dict[str, object]) -> str:
+        """Derive a prefixed SHA-256 identity from canonical JSON material.
+
+        Parameters
+        ----------
+        prefix
+            Stable contract-specific identity prefix.
+        material
+            JSON-compatible identity fields whose keys are sorted.
+
+        Returns
+        -------
+        str
+            Prefixed lowercase SHA-256 identity.
+
+        Raises
+        ------
+        TypeError
+            If ``material`` is not JSON serializable.
+        UnicodeEncodeError
+            If serialized material cannot be encoded as strict UTF-8.
+        """
+
+        # Compact sorted JSON makes field boundaries explicit and independent
+        # of dictionary insertion order.
         encoded = json.dumps(
             material,
             ensure_ascii=False,
@@ -87,7 +207,13 @@ class _PageProjectionChunkingIdentity:
 
 
 class PageProjectionChunkStyle(StrEnum):
-    """Preserve the admitted page-projection text style."""
+    """Enumerate page-projection styles admitted by the chunking policy.
+
+    Notes
+    -----
+    The closed values preserve the exact producer meaning. They are not Search
+    ranking labels and must not be inferred from text.
+    """
 
     PARAGRAPH = "paragraph"
     HEADING = "heading"
@@ -96,7 +222,56 @@ class PageProjectionChunkStyle(StrEnum):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PageProjectionChunk(DataObjectModel):
-    """Bind one exact projected block to source-local citation provenance."""
+    """Bind one exact projected block to source-local citation provenance.
+
+    Attributes
+    ----------
+    page_projection_result_id
+        Complete upstream page-projection result identity.
+    source_id
+        Stable identity of the source from which evidence was read.
+    document_id
+        Stable identity of the canonical reading-evidence document.
+    source_result_id
+        Identity of the exact reading-evidence source result.
+    artifact_verification_result_id
+        Identity of the managed-artifact verification result.
+    reading_projection_result_id
+        Identity of the canonical reading-evidence projection result.
+    reading_inventory_id
+        Identity of the canonical reading-evidence inventory.
+    page_projection_page_id
+        Identity of the projected page containing the block.
+    source_page_id
+        Identity of the canonical upstream evidence page.
+    page_location_id
+        Identity of the retained physical and printed page location.
+    physical_page_index
+        Zero-based physical page position.
+    printed_page_label
+        Optional source-visible printed page label.
+    page_projection_block_id
+        Identity of the exact admitted projected block.
+    source_evidence_id
+        Identity of the canonical block or caption evidence.
+    order_index
+        Zero-based source order within the physical page.
+    style
+        Exact closed paragraph, heading, or figure-caption style.
+    text
+        Exact nonempty projected text, without normalization.
+    text_sha256
+        Derived lowercase digest of the exact UTF-8 text bytes.
+    text_utf8_bytes
+        Derived length of the exact UTF-8 text bytes.
+    chunk_id
+        Derived source-local identity of this immutable chunk.
+
+    Notes
+    -----
+    Global result bindings remain available for provenance resolution but do
+    not renumber an otherwise identical source-local chunk.
+    """
 
     CONTRACT_VERSION: ClassVar[str] = "1.0"
     POLICY_ID: ClassVar[str] = "page-projection-block-local"
@@ -134,6 +309,19 @@ class PageProjectionChunk(DataObjectModel):
     chunk_id: str = field(init=False)
 
     def __post_init__(self) -> None:
+        """Validate fields and derive text measures and source-local identity.
+
+        Raises
+        ------
+        TypeError
+            If ``style`` is not a ``PageProjectionChunkStyle`` member.
+        ValueError
+            If an identity, position, label, or text value is malformed or
+            exceeds its bound.
+        """
+
+        # Provenance values are validated even when they do not participate in
+        # local chunk identity: each must remain safe and directly resolvable.
         for label, value in (
             ("page projection result ID", self.page_projection_result_id),
             ("source ID", self.source_id),
@@ -168,6 +356,8 @@ class PageProjectionChunk(DataObjectModel):
                 label="printed page label",
                 maximum_bytes=self.MAXIMUM_IDENTITY_BYTES,
             )
+        # Refuse arbitrary string-compatible styles so policy expansion must be
+        # explicit and versioned instead of silently accepted.
         if not isinstance(self.style, PageProjectionChunkStyle):
             raise TypeError("style must be PageProjectionChunkStyle")
         text = _PageProjectionChunkingValidation.require_text(
@@ -179,6 +369,9 @@ class PageProjectionChunk(DataObjectModel):
         text_sha256 = hashlib.sha256(encoded).hexdigest()
         object.__setattr__(self, "text_sha256", text_sha256)
         object.__setattr__(self, "text_utf8_bytes", len(encoded))
+        # Only source-local position, evidence, policy, processor, and text
+        # define chunk identity. Complete-result bindings above are provenance,
+        # not a source-local renumbering mechanism.
         object.__setattr__(
             self,
             "chunk_id",
@@ -208,14 +401,35 @@ class PageProjectionChunk(DataObjectModel):
 
     @property
     def physical_page_number(self) -> int:
-        """Return the positive physical citation number."""
+        """Return the positive physical citation number.
+
+        Returns
+        -------
+        int
+            One-based physical page number derived from the stored index.
+        """
 
         return self.physical_page_index + 1
 
 
 @dataclass(frozen=True, slots=True, init=False)
 class PageProjectionChunkInventory(DataObjectModel):
-    """Own the ordered complete chunk derivation for one projection result."""
+    """Own the ordered complete chunk derivation for one projection result.
+
+    Attributes
+    ----------
+    page_projection_result_id
+        Identity of the exact upstream result represented by the inventory.
+    text_utf8_bytes
+        Sum of exact UTF-8 byte lengths across all member chunks.
+    inventory_id
+        Identity binding the upstream result and ordered chunk identities.
+
+    Notes
+    -----
+    An empty inventory is valid and remains bound to its upstream result; no
+    placeholder chunk is fabricated for pages without projected text blocks.
+    """
 
     CONTRACT_VERSION: ClassVar[str] = "1.0"
     MAXIMUM_CHUNKS: ClassVar[int] = 1_000_000
@@ -231,10 +445,30 @@ class PageProjectionChunkInventory(DataObjectModel):
         page_projection_result_id: str,
         chunks: tuple[PageProjectionChunk, ...],
     ) -> None:
+        """Create a validated immutable chunk inventory.
+
+        Parameters
+        ----------
+        page_projection_result_id
+            Identity of the complete upstream projection result.
+        chunks
+            Exact chunks in canonical physical-page and block order.
+
+        Raises
+        ------
+        TypeError
+            If ``chunks`` is not an immutable tuple of exact chunk objects.
+        ValueError
+            If identities, count, result bindings, uniqueness, or canonical
+            order are invalid.
+        """
+
         _PageProjectionChunkingValidation.require_identity(
             value=page_projection_result_id,
             label="page projection result ID",
         )
+        # Exact tuple and member types prevent mutable or behavior-bearing
+        # containers from weakening the inventory's frozen value semantics.
         if type(chunks) is not tuple:
             raise TypeError("chunks must be an immutable tuple")
         if len(chunks) > self.MAXIMUM_CHUNKS:
@@ -275,12 +509,36 @@ class PageProjectionChunkInventory(DataObjectModel):
         )
 
     def __bool__(self) -> bool:
+        """Return whether the inventory contains at least one chunk.
+
+        Returns
+        -------
+        bool
+            ``True`` for a nonempty inventory; otherwise ``False``.
+        """
+
         return bool(self._chunks)
 
     def __iter__(self) -> Iterator[PageProjectionChunk]:
+        """Iterate over chunks in canonical source order.
+
+        Yields
+        ------
+        PageProjectionChunk
+            Each immutable chunk exactly once.
+        """
+
         return iter(self._chunks)
 
     def __len__(self) -> int:
+        """Return the number of derived chunks.
+
+        Returns
+        -------
+        int
+            Inventory member count.
+        """
+
         return len(self._chunks)
 
     @classmethod
@@ -289,12 +547,33 @@ class PageProjectionChunkInventory(DataObjectModel):
         *,
         projection_result: PageProjectionResult,
     ) -> PageProjectionChunkInventory:
-        """Derive exactly one Search chunk from each projected text block."""
+        """Derive exactly one Search chunk per projected text block.
+
+        Parameters
+        ----------
+        projection_result
+            Exact fresh current-schema Ingestion page-projection result.
+
+        Returns
+        -------
+        PageProjectionChunkInventory
+            Complete ordered block-local derivation, including a valid empty
+            inventory when the projection contains no blocks.
+
+        Raises
+        ------
+        TypeError
+            If ``projection_result`` is not the exact producer result type.
+        ValueError
+            If the result is stale or a projected style is unsupported.
+        """
 
         PageProjectionChunkingRequest.require_fresh_projection_result(
             projection_result=projection_result
         )
         chunks: list[PageProjectionChunk] = []
+        # Preserve producer page and block iteration order. Version 1 performs
+        # no joining, splitting, filtering, sorting, or text normalization.
         for page in projection_result.pages:
             for block in page.blocks:
                 try:
@@ -342,6 +621,21 @@ class PageProjectionChunkInventory(DataObjectModel):
         page_projection_result_id: str,
         chunk_ids: tuple[str, ...],
     ) -> str:
+        """Derive inventory identity from result and ordered chunk identities.
+
+        Parameters
+        ----------
+        page_projection_result_id
+            Identity of the exact complete upstream result.
+        chunk_ids
+            Chunk identities in canonical source order.
+
+        Returns
+        -------
+        str
+            Prefixed lowercase SHA-256 inventory identity.
+        """
+
         digest = hashlib.sha256()
         digest.update(
             cls._framed(
@@ -362,12 +656,35 @@ class PageProjectionChunkInventory(DataObjectModel):
 
     @staticmethod
     def _framed(*, value: bytes) -> bytes:
+        """Prefix bytes with an unsigned fixed-width length.
+
+        Parameters
+        ----------
+        value
+            Exact field bytes to frame.
+
+        Returns
+        -------
+        bytes
+            Eight-byte big-endian length followed by ``value``.
+        """
+
+        # Length framing prevents ambiguous concatenation between adjacent
+        # variable-width identity fields.
         return len(value).to_bytes(8, byteorder="big", signed=False) + value
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PageProjectionChunkingRequest(DataObjectActionRequest):
-    """Request the fixed block-local derivation of one exact projection."""
+    """Request the fixed block-local derivation of one exact projection.
+
+    Attributes
+    ----------
+    projection_result
+        Exact fresh current-schema Ingestion page-projection result.
+    request_id
+        Deterministic identity binding projection result and policy versions.
+    """
 
     CONTRACT_NAME: ClassVar[str] = "page-projection-chunking-request"
     CONTRACT_VERSION: ClassVar[str] = "1.0"
@@ -378,6 +695,16 @@ class PageProjectionChunkingRequest(DataObjectActionRequest):
     request_id: str = field(init=False)
 
     def __post_init__(self) -> None:
+        """Validate the producer result and derive immutable request identity.
+
+        Raises
+        ------
+        TypeError
+            If the producer value is not the exact required result type.
+        ValueError
+            If producer validation or deterministic identity is stale.
+        """
+
         self.require_fresh_projection_result(
             projection_result=self.projection_result
         )
@@ -405,10 +732,25 @@ class PageProjectionChunkingRequest(DataObjectActionRequest):
         *,
         projection_result: PageProjectionResult,
     ) -> None:
-        """Require one exact fresh current-schema Ingestion leaf result."""
+        """Require one exact fresh current-schema Ingestion leaf result.
+
+        Parameters
+        ----------
+        projection_result
+            Candidate producer result to revalidate.
+
+        Raises
+        ------
+        TypeError
+            If the candidate is not exactly ``PageProjectionResult``.
+        ValueError
+            If reconstruction fails or differs from the supplied value.
+        """
 
         if type(projection_result) is not PageProjectionResult:
             raise TypeError("projection_result must be PageProjectionResult")
+        # Reconstruct through the producer's public invariants instead of
+        # trusting stored derived fields that could have been force-mutated.
         try:
             fresh = PageProjectionResult(
                 request=projection_result.request,
@@ -431,7 +773,20 @@ class PageProjectionChunkingRequest(DataObjectActionRequest):
         *,
         request: PageProjectionChunkingRequest,
     ) -> None:
-        """Reject post-construction changes to the request or source result."""
+        """Reject post-construction changes to a request or source result.
+
+        Parameters
+        ----------
+        request
+            Candidate request to reconstruct and compare.
+
+        Raises
+        ------
+        TypeError
+            If the candidate is not the exact request class.
+        ValueError
+            If reconstruction fails or differs from the supplied request.
+        """
 
         if type(request) is not cls:
             raise TypeError("request must be PageProjectionChunkingRequest")
@@ -445,7 +800,21 @@ class PageProjectionChunkingRequest(DataObjectActionRequest):
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class PageProjectionChunkingResult(DataObjectActionResult):
-    """Bind one exact request to its complete deterministic chunk inventory."""
+    """Bind one exact request to its complete deterministic chunk inventory.
+
+    Attributes
+    ----------
+    request
+        Exact fresh block-local chunking request.
+    chunks
+        Complete inventory independently re-derived during validation.
+    chunker_implementation_id
+        Stable identity of the action implementation.
+    chunker_implementation_version
+        Version of the deterministic derivation algorithm.
+    result_id
+        Deterministic identity binding request, inventory, and implementation.
+    """
 
     CONTRACT_NAME: ClassVar[str] = "page-projection-chunking-result"
     CONTRACT_VERSION: ClassVar[str] = "1.0"
@@ -457,11 +826,24 @@ class PageProjectionChunkingResult(DataObjectActionResult):
     result_id: str = field(init=False)
 
     def __post_init__(self) -> None:
+        """Validate complete derivation and compute immutable result identity.
+
+        Raises
+        ------
+        TypeError
+            If the chunk inventory is not the exact required type.
+        ValueError
+            If the request is stale, chunks differ from derivation, or the
+            implementation identity is unsupported.
+        """
+
         PageProjectionChunkingRequest.require_fresh_request(
             request=self.request
         )
         if type(self.chunks) is not PageProjectionChunkInventory:
             raise TypeError("chunks must be PageProjectionChunkInventory")
+        # Re-derive the complete inventory so callers cannot pair a valid
+        # request with omitted, reordered, or otherwise substituted chunks.
         expected = PageProjectionChunkInventory.from_projection_result(
             projection_result=self.request.projection_result
         )
@@ -511,7 +893,13 @@ class PageProjectionChunker(
         PageProjectionChunkingResult,
     ]
 ):
-    """Derive fixed block-local Search chunks without side effects."""
+    """Derive fixed block-local Search chunks without side effects.
+
+    Notes
+    -----
+    The action is pure with respect to its immutable request. It owns no cache,
+    storage adapter, index, retrieval policy, model, or network client.
+    """
 
     __slots__ = ()
 
@@ -525,7 +913,27 @@ class PageProjectionChunker(
         *,
         request: PageProjectionChunkingRequest,
     ) -> PageProjectionChunkingResult:
-        """Return the complete deterministic chunk derivation."""
+        """Return the complete deterministic chunk derivation.
+
+        Parameters
+        ----------
+        request
+            Exact fresh request containing one producer result.
+
+        Returns
+        -------
+        PageProjectionChunkingResult
+            Validated request, complete ordered inventory, implementation
+            identity, and deterministic result identity.
+
+        Raises
+        ------
+        TypeError
+            If request or nested contract values have incorrect exact types.
+        ValueError
+            If request, producer result, chunks, or identities are invalid or
+            stale.
+        """
 
         PageProjectionChunkingRequest.require_fresh_request(request=request)
         chunks = PageProjectionChunkInventory.from_projection_result(
