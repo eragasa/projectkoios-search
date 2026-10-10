@@ -1,8 +1,9 @@
 # `projectkoios.indexing` package implementation architecture
 
-The package facade exposes the repository's two in-memory search indexes. The
-indexes consume records and request types owned by `projectkoios.search`; the
-facade itself contains no indexing behavior.
+The package owns two facade-exported in-memory search indexes and one direct
+MongoDB page-projection lexical adapter. Implementations consume contracts owned
+by `projectkoios.search`; the facade itself contains no indexing behavior and
+does not import the MongoDB leaf.
 
 ## Module inventory
 
@@ -10,6 +11,8 @@ facade itself contains no indexing behavior.
   case-insensitive substring scoring over `TextChunk` records.
 - [`in_memory_role_scoped_index`](in_memory_role_scoped_index/index.md) —
   purpose- and role-admitted deterministic BM25 retrieval.
+- [`mongodb_page_projection_lexical`](mongodb_page_projection_lexical/index.md) —
+  injected MongoDB immutable generations and bounded deterministic BM25.
 
 ## Contents
 
