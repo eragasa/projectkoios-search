@@ -4,6 +4,7 @@
 flowchart TB
     Ingestion["Ingestion PageProjectionResult"] --> Chunking["page_projection_chunking"]
     Chunking --> SearchChunks["Search-owned chunks"]
+    SearchChunks --> Lexical["page_projection_lexical structural boundary"]
     Facade["projectkoios.search facade"] --> Evidence["evidence_retrieval"]
     Facade --> Literature["literature"]
     Facade --> Models["models"]
@@ -20,6 +21,9 @@ flowchart TB
     Chunking -. "no import" .-> Models
     Chunking -. "no import" .-> Protocols
     Chunking -. "not facade-exported" .-> Facade
+    Lexical -. "no import" .-> Ingestion
+    Lexical -. "not facade-exported" .-> Facade
+    MongoLexical["indexing.mongodb_page_projection_lexical"] --> Lexical
 ```
 
 Solid arrows represent imports, derivation, or facade exports. Dotted

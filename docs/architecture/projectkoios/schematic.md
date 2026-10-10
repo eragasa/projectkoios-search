@@ -9,6 +9,7 @@ flowchart LR
     Chunking["projectkoios.chunking"] --> Search
     Chunking --> Indexing
     Search --> Indexing
+    Mongo["injected Mongo Database capability"] --> Indexing
     Search --> Consumers["explicit downstream consumers"]
     Indexing --> Consumers
 ```
@@ -16,6 +17,7 @@ flowchart LR
 `projectkoios.base` and legacy `projectkoios.chunking` are shared
 dependency-owned boundaries. The Ingestion arrow terminates only at Search's
 `page_projection_chunking` module; indexing and retrieval remain independent of
-it. This repository's indexing implementations consume Search-owned models
-while both package facades remain explicit. Neither package acquires product
-authority from the namespace.
+it. The Mongo lexical leaf consumes only Search-owned structural contracts and
+an injected database capability. This repository's indexing implementations
+consume Search-owned models while both package facades remain explicit. Neither
+package acquires product authority from the namespace.
