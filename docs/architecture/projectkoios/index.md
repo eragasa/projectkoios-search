@@ -12,6 +12,6 @@ algorithms, bounds, and validation described below.
 ## Contents
 
 - [`indexing`](indexing/index.md) — in-memory index implementations and facade.
-- [`search`](search/index.md) — search models, protocols, services, and retrieval families.
+- [`search`](search/index.md) — deterministic page-projection chunking plus search models, protocols, services, and retrieval families.
 - [`schematic.md`](schematic.md) — namespace relationships.
 - [`implementation.md`](implementation.md) — namespace implementation rules.

@@ -9,6 +9,7 @@ at their defining modules without aliases or conversion paths.
 
 | Module | Role | Relationship to authoring retrieval |
 |---|---|---|
+| [`page_projection_chunking`](page_projection_chunking/index.md) | Pure deterministic block-local chunks from exact Ingestion page projection | Upstream source-chunk derivation only; no indexing or retrieval import |
 | [`evidence_retrieval`](evidence_retrieval/index.md) | Bounded text-only authoring evidence and deterministic lexical retrieval | Canonical independent family |
 | [`literature`](literature/index.md) | Literature-review records, bundling, protocol, and SQLite FTS adapter | Independent prototype family |
 | [`models`](models/index.md) | Chunk results, retrieval purposes, roles, admissions, requests, and results | Independent prototype records; not authoring source evidence |
@@ -17,11 +18,15 @@ at their defining modules without aliases or conversion paths.
 
 Removing or adapting an existing surface requires a coordinated consumer
 migration. The authoring family provides no compatibility aliases or adapters.
+The page-projection chunking leaf is imported directly rather than re-exported
+by the package initializer, so importing indexing and retrieval modules does not
+load Ingestion.
 
 ## Contents
 
 - [`schematic.md`](schematic.md) — package and module relationships.
 - [`implementation.md`](implementation.md) — facade, exports, and dependency rules.
+- [`page_projection_chunking`](page_projection_chunking/index.md) — exact page-projection chunk derivation.
 - [`evidence_retrieval`](evidence_retrieval/index.md) — canonical authoring evidence implementation.
 - [`literature`](literature/index.md) — reference-only literature retrieval prototype.
 - [`models`](models/index.md) — shared prototype records and admission policy.

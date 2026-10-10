@@ -45,6 +45,26 @@ The source corpus excludes:
 Generated artifacts may be retained in a separate provenance graph. They never
 silently become retrievable source evidence.
 
+The observed implemented precursor for paragraph, heading, and figure-caption
+text is
+`projectkoios.search.page_projection_chunking.PageProjectionChunkingResult` /
+`PageProjectionChunk` contract `1.0`, derived only from the exact
+`projectkoios.ingestion.page.projection.result.PageProjectionResult` contract
+`1.0`. This path is not evidence-unit conformance: it does not supply every
+field or status proposed by this contract. In production, only
+`projectkoios.search.page_projection_chunking` may import that exact Ingestion
+leaf. Search production code must not import or dereference Ingestion-internal
+`CleanTranscript`, `ReadingEvidenceDocument`, `ReadingEvidenceSourceResult`, or
+their object graphs. Test-local fixture reconstruction may import Ingestion
+constructors solely to reconstruct and verify the producer-owned sanitized
+observation; that test evidence creates no production dependency, codec, DTO,
+or compatibility promise.
+
+Producer boundaries for proposed table, figure-media/region, and equation
+evidence remain unresolved. That unresolved dependency blocks acceptance of the
+`projectkoios.search.evidence-unit` proposal; it does not block the implemented
+page-projection chunking path.
+
 ## Contract layers
 
 The suite separates:
@@ -96,9 +116,9 @@ acceptance when they affect observable behavior.
 | Task | [`SEARCH-EVIDENCE-01`](https://github.com/eragasa/projectkoios-search/issues/1) |
 | Predecessor | None registered |
 | Supersedes | None while proposed |
-| Dependencies | `projectkoios.ingestion.clean-transcript@0.1.0`; `projectkoios.references.candidate-manifest@0.1.0` |
+| Dependencies | `projectkoios.references.candidate-manifest@0.1.0`; table, figure-media/region, and equation producer contract dependencies remain unresolved |
 | Consumers | Search index builders and lanes; `projectkoios.search.evidence-bundle` |
-| Implementation bindings | Existing `TextChunk` is a prototype and is not superseded by proposal publication |
+| Implementation bindings | Observed implemented precursor (not evidence-unit conformance): `projectkoios.search.page_projection_chunking.PageProjectionChunkingResult` / `PageProjectionChunk` contract `1.0`, derived from exact `projectkoios.ingestion.page.projection.result.PageProjectionResult` contract `1.0`. Existing `TextChunk` remains a prototype. Proposal publication supersedes neither implementation and establishes no compatibility promise. |
 | Compatibility | Breaking migration from the current prototype; no accepted predecessor contract exists |
 | Effective baseline | None while proposed |
 
@@ -375,6 +395,8 @@ This contract does not select:
 - retrieval-unit granularity;
 - lexical storage or BM25 implementation;
 - embedding model or vector store;
+- producer contract boundaries for table, figure-media/region, and equation
+  evidence;
 - equation admission thresholds;
 - fusion parameters;
 - corpus-specific relevance judgments;

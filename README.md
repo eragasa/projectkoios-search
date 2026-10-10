@@ -1,8 +1,14 @@
 # projectkoios-search
 
-Full-text and semantic search infrastructure for Project Koios.
+Deterministic chunk derivation, full-text search, and semantic search
+infrastructure for Project Koios.
 
 Repository routing is documented in `projectkoios-bootstrap/maps/repositories.md`.
+
+## Architecture
+
+The Search-owned pure page-projection chunking boundary is documented in the
+[`page_projection_chunking` implementation architecture](docs/architecture/projectkoios/search/page_projection_chunking/index.md).
 
 ## Contracts
 
