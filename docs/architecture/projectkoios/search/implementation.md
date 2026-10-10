@@ -19,7 +19,6 @@ classDiagram
     class ServiceModule["service"]
 
     PageProjectionChunkingModule --> PageProjectionResult : exact leaf input
-    SearchFacade .. PageProjectionChunkingModule : direct import only
     SearchFacade --> EvidenceRetrievalModule : re-export
     SearchFacade --> LiteratureModule : re-export
     SearchFacade --> ModelsModule : re-export
