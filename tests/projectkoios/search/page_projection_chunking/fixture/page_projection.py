@@ -1,4 +1,14 @@
-"""Semantic fixtures for current-schema page projection tests."""
+"""Current-schema mixed page-projection and observation fixtures.
+
+The typed builder augments canonical paragraph and figure evidence with retained
+non-emittable table and equation blocks. The observer exposes only safe,
+deterministic fields copied into the cross-repository JSON fixture.
+
+Notes
+-----
+Table and equation evidence intentionally remain present upstream while absent
+from projected blocks, proving Search cannot reach behind the page projection.
+"""
 
 from __future__ import annotations
 
@@ -83,18 +93,44 @@ from .visual_projection import ReadingVisualProjectionFixture
 
 @dataclass(frozen=True, slots=True)
 class PageProjectionMixedVisualFixture:
-    """Own one valid text, figure, table, and equation canonical document."""
+    """Own a valid text, figure, table, and equation canonical document.
+
+    Attributes
+    ----------
+    canonical
+        Independently actionized paragraph-and-figure reading projection.
+    foundation
+        Shared synthetic evidence builder.
+    document
+        Derived document with synchronized table/equation lineage.
+    """
 
     canonical: ReadingEvidenceProjectionResult
     foundation: ReadingEvidenceFoundationFixture
     document: ReadingEvidenceDocument = field(init=False)
 
     def __post_init__(self) -> None:
+        """Derive the synchronized document for this frozen fixture.
+
+        Notes
+        -----
+        ``object.__setattr__`` is limited to the declared ``init=False`` field.
+        """
+
+        # ``document`` is derived exactly once while preserving frozen fixture
+        # semantics for all test callers.
         object.__setattr__(self, "document", self.derive_document())
 
     @classmethod
     def build(cls) -> PageProjectionMixedVisualFixture:
-        """Build one complete mixed canonical fixture."""
+        """Build one complete mixed canonical fixture.
+
+        Returns
+        -------
+        PageProjectionMixedVisualFixture
+            Typed canonical result plus its synchronized mixed document.
+        """
+
         projection = ReadingVisualProjectionFixture.build()
         canonical = ReadingEvidenceProjectionActionizer().action(
             request=projection.request
@@ -105,7 +141,14 @@ class PageProjectionMixedVisualFixture:
         )
 
     def derive_table_block(self) -> ReadingTableEvidenceBlock:
-        """Return one valid non-emittable canonical table block."""
+        """Return one valid non-emittable canonical table block.
+
+        Returns
+        -------
+        ReadingTableEvidenceBlock
+            Retained ruled-table evidence excluded from projected text blocks.
+        """
+
         page = next(iter(self.canonical.document.pages))
         source_object_id = self.foundation.identity(
             ReadingEvidenceIdentityKind.SOURCE_OBJECT,
@@ -148,7 +191,14 @@ class PageProjectionMixedVisualFixture:
         )
 
     def derive_equation_block(self) -> ReadingEquationEvidenceBlock:
-        """Return one valid non-emittable canonical equation block."""
+        """Return one valid non-emittable canonical equation block.
+
+        Returns
+        -------
+        ReadingEquationEvidenceBlock
+            Retained equation whose gate explicitly forbids chunk text.
+        """
+
         page = next(iter(self.canonical.document.pages))
         source_object_id = self.foundation.identity(
             ReadingEvidenceIdentityKind.SOURCE_OBJECT,
@@ -197,7 +247,15 @@ class PageProjectionMixedVisualFixture:
         )
 
     def derive_document(self) -> ReadingEvidenceDocument:
-        """Return the exact mixed document with synchronized lineage."""
+        """Return the exact mixed document with synchronized lineage.
+
+        Returns
+        -------
+        ReadingEvidenceDocument
+            Canonical document containing all four evidence kinds with updated
+            producer inventory IDs and managed artifacts.
+        """
+
         document = self.canonical.document
         page = next(iter(document.pages))
         table_block = self.derive_table_block()
@@ -215,6 +273,8 @@ class PageProjectionMixedVisualFixture:
         equations = ReadingEquationProducerEvidenceInventory(
             equation_block.producer_evidence
         )
+        # Merge by content identity because multiple visual producers may
+        # legitimately reference the same managed artifact.
         references = {
             value.artifact_id: value for value in document.managed_artifacts
         }
@@ -264,7 +324,13 @@ class PageProjectionMixedVisualFixture:
 
 @dataclass(frozen=True, slots=True)
 class PageProjectionObservationFixture:
-    """Project one typed result into sanitized cross-repository evidence."""
+    """Project one typed result into sanitized cross-repository evidence.
+
+    Attributes
+    ----------
+    result
+        Exact Ingestion page-projection result to observe.
+    """
 
     FIXTURE_KIND: ClassVar[str] = (
         "projectkoios.ingestion.page-projection-observation"
@@ -274,11 +340,29 @@ class PageProjectionObservationFixture:
     result: PageProjectionResult
 
     def __post_init__(self) -> None:
+        """Require the exact current-schema Ingestion result type.
+
+        Raises
+        ------
+        TypeError
+            If a subtype or structurally similar object is supplied.
+        """
+
+        # Exact type, rather than structural compatibility, freezes the copied
+        # fixture to the declared current-schema producer leaf.
         if type(self.result) is not PageProjectionResult:
             raise TypeError("result must be PageProjectionResult")
 
     def observation(self) -> dict[str, object]:
-        """Return exact evidence without defining a wire format."""
+        """Return exact safe evidence without defining a wire format.
+
+        Returns
+        -------
+        dict[str, object]
+            JSON-compatible current-schema observation with producer order
+            retained exactly.
+        """
+
         pages: list[dict[str, object]] = []
         for page in self.result.pages:
             blocks = [
@@ -330,5 +414,12 @@ class PageProjectionObservationFixture:
         }
 
     def canonical_bytes(self) -> bytes:
-        """Return compact sorted UTF-8 bytes with no terminal newline."""
+        """Serialize the observation as compact canonical UTF-8 bytes.
+
+        Returns
+        -------
+        bytes
+            Sorted JSON bytes with no terminal newline.
+        """
+
         return CanonicalJsonSerializer.serialize_bytes(self.observation())

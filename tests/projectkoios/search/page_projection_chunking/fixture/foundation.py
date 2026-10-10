@@ -1,4 +1,14 @@
-"""Semantic fixture owner for reading-evidence foundation contracts."""
+"""Deterministic foundation values for typed reading-evidence fixtures.
+
+This module centralizes small synthetic identities, pages, spans, streams, and
+visual evidence used to reconstruct the exact Ingestion page-projection result.
+It performs no file access, extraction, model execution, or publication.
+
+Notes
+-----
+Values intentionally use obvious synthetic text and identities so no protected
+source content or private locator can enter the cross-repository fixture.
+"""
 
 from __future__ import annotations
 
@@ -13,6 +23,7 @@ from projectkoios.ingestion.artifact.managed.media.type import (
 from projectkoios.ingestion.artifact.managed.reference import (
     ManagedArtifactReference,
 )
+from projectkoios.ingestion.sha256.hash import SHA256Hash
 from projectkoios.ingestion.transcript.reading.evidence.association.evidence import (  # noqa: E501
     ReadingAssociationEvidence,
 )
@@ -77,20 +88,52 @@ from projectkoios.ingestion.transcript.reading.evidence.stream.selection.definit
 
 @dataclass(frozen=True, slots=True)
 class ReadingEvidenceFoundationFixture:
-    """Build deterministic exact values shared by foundation tests."""
+    """Build exact synthetic values shared by reading-evidence fixtures.
 
-    digest: str = "a" * 64
+    Attributes
+    ----------
+    digest
+        Lowercase synthetic SHA-256 used for managed artifact references.
+    """
+
+    digest: SHA256Hash = SHA256Hash("a" * 64)
 
     def identity(
         self,
         kind: ReadingEvidenceIdentityKind,
         token: str,
     ) -> ReadingEvidenceIdentity:
-        """Return one explicit typed external identity."""
+        """Return one explicit typed synthetic identity.
+
+        Parameters
+        ----------
+        kind
+            Required Ingestion identity role.
+        token
+            Human-readable synthetic discriminator within that role.
+
+        Returns
+        -------
+        ReadingEvidenceIdentity
+            Typed identity with no filesystem or private-source locator.
+        """
+
         return ReadingEvidenceIdentity(kind=kind, value=f"{kind.value}:{token}")
 
     def page(self, index: int = 0) -> ReadingPageLocation:
-        """Return one canonical page location."""
+        """Return one canonical physical and printed page location.
+
+        Parameters
+        ----------
+        index
+            Zero-based physical page index.
+
+        Returns
+        -------
+        ReadingPageLocation
+            Location whose printed label is the corresponding positive number.
+        """
+
         return ReadingPageLocation(
             physical_page_index=index,
             printed_page_label=str(index + 1),
@@ -103,7 +146,19 @@ class ReadingEvidenceFoundationFixture:
             ManagedArtifactMediaType.IMAGE_PNG
         ),
     ) -> ManagedArtifactReference:
-        """Return one exact managed artifact reference."""
+        """Return one exact bounded managed artifact reference.
+
+        Parameters
+        ----------
+        media_type
+            Closed media type assigned to the synthetic artifact.
+
+        Returns
+        -------
+        ManagedArtifactReference
+            Content-addressed reference with no storage locator or payload.
+        """
+
         return ManagedArtifactReference(
             sha256=self.digest,
             byte_length=128,
@@ -111,7 +166,14 @@ class ReadingEvidenceFoundationFixture:
         )
 
     def artifact_inventory(self) -> ManagedArtifactReferenceInventory:
-        """Return one nonempty managed artifact inventory."""
+        """Return a nonempty inventory containing the synthetic artifact.
+
+        Returns
+        -------
+        ManagedArtifactReferenceInventory
+            Exact one-member managed artifact inventory.
+        """
+
         return ManagedArtifactReferenceInventory(self.artifact())
 
     def native_streams(
@@ -119,8 +181,22 @@ class ReadingEvidenceFoundationFixture:
         *,
         page: ReadingPageLocation | None = None,
     ) -> ReadingTextStreamEvidenceInventory:
-        """Return exact native-only stream evidence."""
+        """Return exact native-only text stream evidence.
+
+        Parameters
+        ----------
+        page
+            Optional explicit page; page zero is used when omitted.
+
+        Returns
+        -------
+        ReadingTextStreamEvidenceInventory
+            One unreviewed automated native stream.
+        """
+
         location = self.page() if page is None else page
+        # Keep acceptance false and review explicit: synthetic evidence should
+        # not imply a human decision merely because it is structurally valid.
         native = ReadingTextStreamEvidence(
             kind=ReadingTextStreamKind.NATIVE,
             page_location=location,
@@ -142,7 +218,19 @@ class ReadingEvidenceFoundationFixture:
         self,
         streams: ReadingTextStreamEvidenceInventory,
     ) -> ReadingTextSelection:
-        """Select exact native evidence."""
+        """Select the exact native stream without fallback.
+
+        Parameters
+        ----------
+        streams
+            Inventory whose first and only member is selected.
+
+        Returns
+        -------
+        ReadingTextSelection
+            Selection using the explicit ``NATIVE_EXACT`` basis.
+        """
+
         native = next(iter(streams))
         return ReadingTextSelection(
             streams=streams,
@@ -155,7 +243,19 @@ class ReadingEvidenceFoundationFixture:
         *,
         page: ReadingPageLocation | None = None,
     ) -> ReadingSourceSpanEvidenceInventory:
-        """Return one exact source span for clean text evidence."""
+        """Return one exact character span for clean text evidence.
+
+        Parameters
+        ----------
+        page
+            Optional explicit page; page zero is used when omitted.
+
+        Returns
+        -------
+        ReadingSourceSpanEvidenceInventory
+            One source span covering the synthetic text offsets.
+        """
+
         location = self.page() if page is None else page
         span = ReadingSourceSpanEvidence(
             source_id=self.identity(ReadingEvidenceIdentityKind.SOURCE, "book"),
@@ -171,7 +271,21 @@ class ReadingEvidenceFoundationFixture:
         source_object_id: ReadingEvidenceIdentity,
         page: ReadingPageLocation | None = None,
     ) -> ReadingSourceSpanEvidenceInventory:
-        """Return one exact visual source span."""
+        """Return one bounded visual-object source span.
+
+        Parameters
+        ----------
+        source_object_id
+            Typed identity of the figure, table, or equation object.
+        page
+            Optional explicit page; page zero is used when omitted.
+
+        Returns
+        -------
+        ReadingSourceSpanEvidenceInventory
+            One span with normalized synthetic bounding-box geometry.
+        """
+
         location = self.page() if page is None else page
         span = ReadingSourceSpanEvidence(
             source_id=self.identity(ReadingEvidenceIdentityKind.SOURCE, "book"),
@@ -186,8 +300,22 @@ class ReadingEvidenceFoundationFixture:
         *,
         page: ReadingPageLocation | None = None,
     ) -> ReadingAssociationEvidenceInventory:
-        """Return one exact caption association."""
+        """Return one exact synthetic caption association.
+
+        Parameters
+        ----------
+        page
+            Optional explicit page; page zero is used when omitted.
+
+        Returns
+        -------
+        ReadingAssociationEvidenceInventory
+            One caption association linked to exact source evidence.
+        """
+
         location = self.page() if page is None else page
+        # Association identity, referenced block identity, and object identity
+        # remain distinct typed roles even in this deliberately small fixture.
         source_object_id = self.identity(
             ReadingEvidenceIdentityKind.SOURCE_OBJECT, "caption"
         )
@@ -215,7 +343,14 @@ class ReadingEvidenceFoundationFixture:
         return ReadingAssociationEvidenceInventory(association)
 
     def labels(self) -> ReadingSourceLabelInventory:
-        """Return one canonical source-label inventory."""
+        """Return one canonical synthetic visual label.
+
+        Returns
+        -------
+        ReadingSourceLabelInventory
+            One-member label inventory containing ``Figure 1``.
+        """
+
         return ReadingSourceLabelInventory("Figure 1")
 
     def producer_lineage(
@@ -227,8 +362,31 @@ class ReadingEvidenceFoundationFixture:
         warning_ids: ReadingEvidenceIdentityInventory | None = None,
         producer_token: str = "visual",
     ) -> ReadingProducerLineage:
-        """Return exact shared producer lineage for one visual object."""
+        """Return exact shared producer lineage for one visual object.
+
+        Parameters
+        ----------
+        source_object_id
+            Typed identity of the visual object.
+        page
+            Optional explicit page; page zero is used when omitted.
+        source_spans
+            Optional exact spans; deterministic synthetic geometry is the
+            default.
+        warning_ids
+            Optional warning identities; the default inventory is empty.
+        producer_token
+            Synthetic token distinguishing the responsible producer.
+
+        Returns
+        -------
+        ReadingProducerLineage
+            Internally consistent lineage with one managed artifact.
+        """
+
         location = self.page() if page is None else page
+        # Resolve defaults before construction so every optional override still
+        # flows through the same strongly typed lineage boundary.
         return ReadingProducerLineage(
             source_object_id=source_object_id,
             page_location=location,
@@ -261,7 +419,25 @@ class ReadingEvidenceFoundationFixture:
         ),
         review_status: ReadingReviewStatus = ReadingReviewStatus.UNREVIEWED,
     ) -> ReadingVisualAssessment:
-        """Return exact shared visual assessment evidence."""
+        """Return exact shared visual assessment evidence.
+
+        Parameters
+        ----------
+        page
+            Optional explicit page; page zero is used when omitted.
+        confidence
+            Synthetic detector confidence retained without reinterpretation.
+        visual_status
+            Typed visual-evidence lifecycle state.
+        review_status
+            Typed human-review state.
+
+        Returns
+        -------
+        ReadingVisualAssessment
+            Assessment containing the deterministic caption association.
+        """
+
         location = self.page() if page is None else page
         return ReadingVisualAssessment(
             associations=self.associations(page=location),
@@ -271,7 +447,14 @@ class ReadingEvidenceFoundationFixture:
         )
 
     def warning_ids(self) -> ReadingEvidenceIdentityInventory:
-        """Return an empty typed warning identity inventory."""
+        """Return an empty typed warning identity inventory.
+
+        Returns
+        -------
+        ReadingEvidenceIdentityInventory
+            Empty inventory whose required identity role is ``WARNING``.
+        """
+
         return ReadingEvidenceIdentityInventory(
             ReadingEvidenceIdentityKind.WARNING
         )

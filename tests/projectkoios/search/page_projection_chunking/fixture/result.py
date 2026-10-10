@@ -1,4 +1,14 @@
-"""Build the exact typed result observed by the copied producer fixture."""
+"""Construct and observe the exact Ingestion page-projection result.
+
+This boundary actionizes the mixed typed document, projects it through the
+current-schema Ingestion producer, and exposes the same sanitized observation
+stored in the copied input fixture.
+
+Notes
+-----
+Search tests call these helpers instead of deserializing JSON because the JSON
+is conformance evidence, not an application wire format.
+"""
 
 from __future__ import annotations
 
@@ -27,7 +37,7 @@ from projectkoios.ingestion.transcript.reading.evidence.source.result import (
     ReadingEvidenceSourceResult,
 )
 
-from tests.projectkoios.search.page_projection_support.page_projection import (
+from .page_projection import (
     PageProjectionMixedVisualFixture,
     PageProjectionObservationFixture,
 )
@@ -40,7 +50,13 @@ _SOURCE_VERIFICATION_ID = "page-projection-test-source-verification"
 
 
 def build_page_projection_result() -> PageProjectionResult:
-    """Return the real typed synthetic result behind the producer bytes."""
+    """Return a fresh exact current-schema producer result.
+
+    Returns
+    -------
+    PageProjectionResult
+        Independently reconstructed typed result accepted by Search.
+    """
 
     fixture = PageProjectionMixedVisualFixture.build()
     document = fixture.document
@@ -66,6 +82,8 @@ def build_page_projection_result() -> PageProjectionResult:
         provider_verification_id=_SOURCE_VERIFICATION_ID,
     )
     references = document.managed_artifacts
+    # Verification is actionized before projection so the request carries an
+    # authentic producer-computed verification result rather than a stub ID.
     verification_request = ManagedArtifactVerificationRequest(
         references=references,
         provider_implementation_id=_PROVIDER_ID,
@@ -106,6 +124,17 @@ def build_page_projection_result() -> PageProjectionResult:
 def observe_page_projection_result(
     result: PageProjectionResult,
 ) -> dict[str, object]:
-    """Return the producer-owned sanitized observation shape."""
+    """Return the sanitized observation used by the copied JSON fixture.
+
+    Parameters
+    ----------
+    result
+        Exact typed Ingestion result to observe.
+
+    Returns
+    -------
+    dict[str, object]
+        JSON-compatible producer observation without private locators.
+    """
 
     return PageProjectionObservationFixture(result=result).observation()

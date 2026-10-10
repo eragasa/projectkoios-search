@@ -1,4 +1,14 @@
-"""Semantic fixture owner for canonical reading evidence projection."""
+"""Canonical paragraph-only reading-evidence projection fixture.
+
+The builder creates every typed Ingestion input needed for an independently
+validated one-page paragraph projection. It does not call Search or load source
+bytes.
+
+Notes
+-----
+Expected counts and identity digests are constructed independently from the
+projection action so the fixture cannot validate itself by copying its output.
+"""
 
 from __future__ import annotations
 
@@ -101,12 +111,23 @@ from projectkoios.ingestion.transcript.reading.evidence.status.review import (
     ReadingReviewStatus,
 )
 
-from tests.projectkoios.search.page_projection_support.foundation import (
-    ReadingEvidenceFoundationFixture,
-)
+from .foundation import ReadingEvidenceFoundationFixture
 
 
 def digest_expected_identity_material(identities: object) -> SHA256Hash:
+    """Fingerprint canonical identity material for expected inventories.
+
+    Parameters
+    ----------
+    identities
+        JSON-compatible ordered identity material.
+
+    Returns
+    -------
+    SHA256Hash
+        Typed digest of the canonical serialized bytes.
+    """
+
     return SHA256Fingerprinter.fingerprint(
         content=CanonicalJsonSerializer.serialize_bytes(identities)
     )
@@ -114,15 +135,31 @@ def digest_expected_identity_material(identities: object) -> SHA256Hash:
 
 @dataclass(frozen=True, slots=True)
 class ReadingEvidenceProjectionFixture:
-    """Own one complete exact paragraph-only projection request."""
+    """Own one complete exact paragraph-only projection request.
+
+    Attributes
+    ----------
+    foundation
+        Shared synthetic identity and evidence builder.
+    request
+        Fully reconciled Ingestion reading-evidence projection request.
+    """
 
     foundation: ReadingEvidenceFoundationFixture
     request: ReadingEvidenceProjectionRequest
 
     @classmethod
     def build(cls) -> ReadingEvidenceProjectionFixture:
-        """Build independent expected evidence and its producer request."""
+        """Build independent expected evidence and its producer request.
+
+        Returns
+        -------
+        ReadingEvidenceProjectionFixture
+            Complete typed fixture with independently computed expectations.
+        """
+
         foundation = ReadingEvidenceFoundationFixture()
+        # Establish source/document identity before deriving page-level records.
         source_artifact = ManagedArtifactReference(
             sha256=foundation.digest,
             byte_length=256,
@@ -147,6 +184,8 @@ class ReadingEvidenceProjectionFixture:
             ),
             producer_version="1",
         )
+        # Keep raw stream selection, structure, and clean text as distinct
+        # producer evidence; collapsing them would bypass Ingestion invariants.
         streams = foundation.native_streams()
         page_text_record = ReadingPageTextProducerEvidence(
             streams=streams,
@@ -197,7 +236,9 @@ class ReadingEvidenceProjectionFixture:
         tables = ReadingTableProducerEvidenceInventory()
         equations = ReadingEquationProducerEvidenceInventory()
         configuration = ReadingEvidenceProjectionConfiguration()
-        inventory_inputs = (
+        # Derive each role inventory separately so lineage cannot confuse
+        # empty visual roles with the populated paragraph roles.
+        inventory_inputs: tuple[tuple[str, list[str]], ...] = (
             ("page_text", [page_text_record.record_id.value]),
             ("structured_items", [structured_record.record_id.value]),
             ("clean_text", [clean_record.record_id.value]),
@@ -237,6 +278,8 @@ class ReadingEvidenceProjectionFixture:
             )
         )
         limitations = ReadingEvidenceLimitationInventory()
+        # Expected measures are calculated from fixture inputs, not from a
+        # projector result, preserving independent conformance evidence.
         text_values = (next(iter(streams)).text, text_block.text)
         expected = ExpectedReadingEvidenceInventory(
             measures=ReadingEvidenceInventoryMeasures(

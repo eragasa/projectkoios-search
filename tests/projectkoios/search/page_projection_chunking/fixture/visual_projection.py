@@ -1,4 +1,14 @@
-"""Semantic fixture owner for canonical visual projection evidence."""
+"""Canonical paragraph-and-figure reading-evidence fixture.
+
+The builder extends the paragraph-only producer request with one synthetic
+figure and one caption association. This makes caption chunking observable while
+keeping all evidence safe to copy across repositories.
+
+Notes
+-----
+Expected measures include an unreviewed-visual limitation because the figure is
+proposed automated evidence rather than human-accepted evidence.
+"""
 
 from __future__ import annotations
 
@@ -112,13 +122,26 @@ from .reading_projection import (
 
 @dataclass(frozen=True, slots=True)
 class ReadingVisualProjectionFixture:
-    """Own one complete paragraph-and-figure projection request."""
+    """Own one complete paragraph-and-figure projection request.
+
+    Attributes
+    ----------
+    request
+        Fully reconciled Ingestion request containing text and visual evidence.
+    """
 
     request: ReadingEvidenceProjectionRequest
 
     @classmethod
     def build(cls) -> ReadingVisualProjectionFixture:
-        """Build expected text, caption, and limitation evidence."""
+        """Build expected text, caption, and limitation evidence.
+
+        Returns
+        -------
+        ReadingVisualProjectionFixture
+            Complete visual request with independently derived expectations.
+        """
+
         base = ReadingEvidenceProjectionFixture.build()
         request = base.request
         foundation = base.foundation
@@ -127,6 +150,8 @@ class ReadingVisualProjectionFixture:
         figure_object_id = foundation.identity(
             ReadingEvidenceIdentityKind.SOURCE_OBJECT, "figure"
         )
+        # The caption association points back to exact paragraph text while the
+        # figure itself retains separate object identity and visual geometry.
         association_span = ReadingSourceSpanEvidence(
             source_id=request.document.source_id,
             page_location=foundation.page(),
@@ -176,13 +201,16 @@ class ReadingVisualProjectionFixture:
             figure_item,
         )
         figures = ReadingFigureProducerEvidenceInventory(figure)
+        # Managed inventories require canonical order, not construction order.
         managed = ManagedArtifactReferenceInventory(
             *sorted(
                 (request.document.source_artifact, visual_artifact),
                 key=lambda value: value.artifact_id,
             )
         )
-        inventory_inputs = (
+        # Inventory IDs bind the producer-level records before the expected
+        # projection lineage and output measures are assembled.
+        inventory_inputs: tuple[tuple[str, list[str]], ...] = (
             (
                 "page_text",
                 [value.record_id.value for value in request.page_text],
@@ -244,6 +272,8 @@ class ReadingVisualProjectionFixture:
                 blocks=ReadingEvidenceBlockInventory(text_block, figure_block),
             )
         )
+        # Proposed visual evidence is admissible but remains explicitly
+        # limited until its human review state changes.
         limitation = ReadingEvidenceLimitation(
             code=ReadingEvidenceLimitationCode.UNREVIEWED_VISUAL_EVIDENCE,
             affected_ids=ReadingAffectedEvidenceIdentityInventory(
