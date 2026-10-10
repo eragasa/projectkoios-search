@@ -15,7 +15,7 @@ from projectkoios.indexing.mongodb_page_projection_lexical import (
 from projectkoios.search.page_projection_lexical import (
     PageProjectionLexicalChunk,
 )
-from pymongo import IndexModel
+from pymongo import IndexModel, UpdateOne
 from pymongo.database import Database
 
 from tests.projectkoios.search.page_projection_chunking.fixture.chunking import (  # noqa: E501
@@ -136,6 +136,53 @@ def test__ensure_indexes__uses_strict_pymongo_list_contract(
             (("generation_id", 1), ("term", 1), ("chunk_id", 1)),
         ),
     ]
+
+
+def test__stage__uses_strict_pymongo_bulk_write_list_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pass exact ordered UpdateOne lists to every bulk-write boundary."""
+
+    observed: list[tuple[UpdateOne, ...]] = []
+    original = MongoMockCollection.bulk_write
+
+    def strict_bulk_write(
+        self: MongoMockCollection,
+        requests: list[UpdateOne],
+        ordered: bool = True,
+        bypass_document_validation: bool = False,
+        session: object | None = None,
+    ) -> object:
+        if type(requests) is not list:
+            raise TypeError("requests must be a list")
+        if ordered is not True:
+            raise TypeError("immutable writes must be ordered")
+        observed.append(tuple(requests))
+        return original(
+            self,
+            requests,
+            ordered=ordered,
+            bypass_document_validation=bypass_document_validation,
+            session=session,
+        )
+
+    monkeypatch.setattr(
+        MongoMockCollection,
+        "bulk_write",
+        strict_bulk_write,
+    )
+    projector = MongoPageProjectionLexicalProjector(
+        database=_database("strict-bulk-write-contract"),
+        storage_target_id="projectkoios.search.mongodb.development",
+    )
+
+    generation = projector.stage(chunks=_chunks())
+
+    assert generation.chunk_count == 2
+    assert [len(batch) for batch in observed] == [1, 2, 4, 5]
+    assert all(
+        type(request) is UpdateOne for batch in observed for request in batch
+    )
 
 
 def test__stage__builds_verified_immutable_generation_idempotently() -> None:

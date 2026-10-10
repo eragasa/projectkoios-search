@@ -957,14 +957,14 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
                 if not batch:
                     continue
                 collection.bulk_write(
-                    tuple(
+                    [
                         UpdateOne(
                             {"_id": document["_id"]},
                             {"$setOnInsert": document},
                             upsert=True,
                         )
                         for document in batch
-                    ),
+                    ],
                     ordered=True,
                 )
         except PyMongoError as error:
