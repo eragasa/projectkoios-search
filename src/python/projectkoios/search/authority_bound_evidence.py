@@ -36,7 +36,7 @@ from projectkoios.ingestion.page.projection.enrichment.request import (
 from projectkoios.ingestion.page.projection.enrichment.result import (
     PageProjectionEvidenceEnrichmentResult,
 )
-from projectkoios.references.course_reference_authority import (
+from projectkoios.references.courses.authority import (
     IngestionArtifactAuthorityLink,
     SearchReferenceAuthorityBinding,
     SearchReferenceAuthorityProjection,

@@ -53,6 +53,9 @@ identities, corpus identity, composer identity/version, request identity, and th
 References result ID. Retrieval identities commit to the admission result and
 underlying deterministic retrieval result.
 
-References owns filesystem reobservation and typed linkage reload. Search owns
-verification that the supplied projection equals the References checkpoint the
-caller declares current; Search neither reads assets nor fabricates freshness.
+References owns filesystem reobservation, typed linkage reload, and the
+`SearchReferenceAuthorityProjectionRequest` → actionizer → result production
+boundary in `projectkoios.references.courses.authority`. Search consumes only
+that exact result type and verifies that the supplied projection equals the
+References checkpoint the caller declares current; Search neither reads assets
+nor fabricates freshness.

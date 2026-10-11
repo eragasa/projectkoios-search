@@ -14,7 +14,7 @@ from projectkoios.ingestion.page.projection.enrichment.actionizer import (
 from projectkoios.ingestion.page.projection.enrichment.request import (
     PageProjectionEvidenceEnrichmentRequest,
 )
-from projectkoios.references.course_reference_authority import (
+from projectkoios.references.courses.authority import (
     IngestionArtifactAuthorityLink,
     SearchReferenceAuthorityBinding,
     SearchReferenceAuthorityProjection,
@@ -577,26 +577,44 @@ def test__production_retriever__rejects_raw_corpus() -> None:
         )
 
 
-def test__module__uses_only_public_ingestion_enrichment_leaf() -> None:
+def _production_module_imports() -> tuple[tuple[str, ...], str]:
     source = (
         Path(__file__).resolve().parents[3]
         / "src/python/projectkoios/search/authority_bound_evidence.py"
     )
-    tree = ast.parse(source.read_text(encoding="utf-8"))
+    text = source.read_text(encoding="utf-8")
+    tree = ast.parse(text)
     imports = tuple(
         node.module
         for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom)
-        and node.module is not None
-        and node.module.startswith("projectkoios.ingestion")
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    )
+    return imports, text
+
+
+def test__module__uses_only_public_ingestion_enrichment_leaf() -> None:
+    imports, text = _production_module_imports()
+    ingestion_imports = tuple(
+        value for value in imports if value.startswith("projectkoios.ingestion")
     )
 
-    assert imports
+    assert ingestion_imports
     assert all(
         value.startswith("projectkoios.ingestion.page.projection.enrichment")
-        for value in imports
+        for value in ingestion_imports
     )
-    text = source.read_text(encoding="utf-8")
     assert "CleanTranscript" not in text
     assert "ReadingEvidenceDocument" not in text
     assert "ReadingEvidenceSourceResult" not in text
+
+
+def test__module__uses_exact_references_courses_authority_leaf() -> None:
+    imports, text = _production_module_imports()
+    references_imports = tuple(
+        value
+        for value in imports
+        if value.startswith("projectkoios.references")
+    )
+
+    assert references_imports == ("projectkoios.references.courses.authority",)
+    assert "course_reference_authority" not in text
