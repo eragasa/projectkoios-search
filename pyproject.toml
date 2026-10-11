@@ -11,11 +11,13 @@ authors = [
 dependencies = [
     "projectkoios==0.0.0",
     "projectkoios-ingestion==0.0.0",
+    "projectkoios-references==0.0.0",
     "pymongo>=4.10,<4.11",
 ]
 
 [tool.uv.sources]
-projectkoios-ingestion = { git = "https://github.com/eragasa/projectkoios-ingestion.git", rev = "42d6a1499c2487359c4210de96d7cb3023013f5b" }
+projectkoios-ingestion = { git = "https://github.com/eragasa/projectkoios-ingestion.git", rev = "b146d684f07513f5a726457e7dd082e73edb50e0" }
+projectkoios-references = { git = "https://github.com/eragasa/projectkoios-references.git", rev = "d9f80ce4e540e8692835487b7a76d936fe906acc" }
 
 [build-system]
 requires = ["setuptools>=61.0.0"]
@@ -48,6 +50,7 @@ mypy_path = [
     "src/python",
     "../projectkoios/src/python",
     "../projectkoios-ingestion/src/python",
+    "../projectkoios-references/src/python",
 ]
 namespace_packages = true
 explicit_package_bases = true

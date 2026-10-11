@@ -3,9 +3,10 @@
 The package initializer re-exports the established explicit inventory and keeps
 all behavior in named modules. Authoring records import shared ABCs from
 `projectkoios.base` and do not import the other search models. The
-`page_projection_chunking` and backend-neutral `page_projection_lexical` leaves
-remain direct public modules rather than facade exports: this prevents ordinary
-imports from loading Ingestion or persistent adapters.
+`page_projection_chunking`, `authority_bound_evidence`, and backend-neutral
+`page_projection_lexical` remain direct public modules rather than facade
+exports: this prevents ordinary imports from loading Ingestion, References, or
+persistent adapters.
 
 ```mermaid
 classDiagram
@@ -15,6 +16,7 @@ classDiagram
     class PageProjectionLexicalModule["page_projection_lexical"]
     class MongoLexicalModule["indexing.mongodb_page_projection_lexical"]
     class EvidenceRetrievalModule["evidence_retrieval"]
+    class AuthorityBoundEvidenceModule["authority_bound_evidence"]
     class LiteratureModule["literature"]
     class ModelsModule["models"]
     class ProtocolsModule["protocols"]
@@ -22,6 +24,8 @@ classDiagram
 
     PageProjectionChunkingModule --> PageProjectionResult : exact leaf input
     PageProjectionChunkingModule ..> PageProjectionLexicalModule : concrete values satisfy protocol
+    AuthorityBoundEvidenceModule --> PageProjectionChunkingModule : exact A
+    AuthorityBoundEvidenceModule --> EvidenceRetrievalModule : existing item/retriever
     MongoLexicalModule --> PageProjectionLexicalModule : contracts
     SearchFacade --> EvidenceRetrievalModule : re-export
     SearchFacade --> LiteratureModule : re-export
@@ -37,9 +41,11 @@ classDiagram
 ```
 
 Facade exports preserve each defining module's class identity; the initializer
-defines no classes of its own. The sole Ingestion dependency is the exact
-`PageProjectionResult` import inside `page_projection_chunking`; indexing and
-retrieval modules do not import that module. The package owns no API transport, persistence, workflow, rights decision,
+defines no classes of its own. Ingestion dependencies are limited to the exact
+`PageProjectionResult` import inside `page_projection_chunking` and public
+enrichment modules inside `authority_bound_evidence`; indexing and unrelated
+retrieval modules import neither leaf. The package owns no API transport,
+persistence, workflow, rights decision,
 publication, or target-document behavior. `page_projection_lexical` owns only
 backend-neutral immutable generation values; Mongo persistence is owned by the
 separate indexing module. Public implementation classes are documented at exact

@@ -8,6 +8,11 @@ This suite does not authorize implementation, corpus publication, embedding
 generation, answer generation, or contract acceptance. The narrower implemented
 family is documented separately in the
 [Search-owned `evidence_retrieval` architecture](../architecture/projectkoios/search/evidence_retrieval/index.md).
+Production manuscript-authoring admission for that family is documented in the
+[`authority_bound_evidence`
+architecture](../architecture/projectkoios/search/authority_bound_evidence/index.md).
+It composes exact Search chunks, public Ingestion enrichment, and accepted
+References authority without accepting this broader proposed contract.
 
 The central decision record formerly linked from this proposal has been
 deleted and is not architecture authority. The commit-pinned Project Koios
@@ -51,9 +56,11 @@ text is
 `PageProjectionChunk` contract `1.0`, derived only from the exact
 `projectkoios.ingestion.page.projection.result.PageProjectionResult` contract
 `1.0`. This path is not evidence-unit conformance: it does not supply every
-field or status proposed by this contract. In production, only
-`projectkoios.search.page_projection_chunking` may import that exact Ingestion
-leaf. Search production code must not import or dereference Ingestion-internal
+field or status proposed by this contract. In production,
+`projectkoios.search.page_projection_chunking` may import only that exact
+Ingestion result leaf, while `projectkoios.search.authority_bound_evidence` may
+import only the public page-projection enrichment leaf needed for composition.
+Search production code must not import or dereference Ingestion-internal
 `CleanTranscript`, `ReadingEvidenceDocument`, `ReadingEvidenceSourceResult`, or
 their object graphs. Test-local fixture reconstruction may import Ingestion
 constructors solely to reconstruct and verify the producer-owned sanitized
@@ -63,7 +70,16 @@ or compatibility promise.
 Producer boundaries for proposed table, figure-media/region, and equation
 evidence remain unresolved. That unresolved dependency blocks acceptance of the
 `projectkoios.search.evidence-unit` proposal; it does not block the implemented
-page-projection chunking path.
+page-projection chunking path or its authority-bound paragraph admission.
+
+The production paragraph path admits only a complete and consistent join of an
+exact `PageProjectionChunkingResult`, public Ingestion page-projection
+enrichment, and an accepted References `SearchReferenceAuthorityProjection`
+matching an expected-current result ID. Missing, unavailable, stale, ambiguous,
+deferred, or candidate authority fails closed with explicit omissions. The
+production lexical retriever accepts only that admission result, never a raw
+candidate-capable `EvidenceCorpus`. These constraints do not remove prototype
+candidate support.
 
 ## Contract layers
 

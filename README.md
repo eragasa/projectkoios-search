@@ -16,7 +16,10 @@ and immutable MongoDB generations plus deterministic BM25 retrieval under
 
 ## Contracts
 
-The implemented text-only authoring evidence foundation is documented in the
-[`evidence_retrieval` implementation architecture](docs/architecture/projectkoios/search/evidence_retrieval/index.md).
-It does not accept the proposed contracts indexed in
+The candidate-capable text-only authoring evidence foundation is documented in
+the [`evidence_retrieval` implementation architecture](docs/architecture/projectkoios/search/evidence_retrieval/index.md).
+Production manuscript admission and retrieval require the accepted References
+authority boundary documented under
+[`authority_bound_evidence`](docs/architecture/projectkoios/search/authority_bound_evidence/index.md).
+These implementations do not accept the proposed contracts indexed in
 [`docs/contracts/README.md`](docs/contracts/README.md).
