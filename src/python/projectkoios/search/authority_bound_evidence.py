@@ -36,8 +36,10 @@ from projectkoios.ingestion.page.projection.enrichment.request import (
 from projectkoios.ingestion.page.projection.enrichment.result import (
     PageProjectionEvidenceEnrichmentResult,
 )
-from projectkoios.references.courses.authority import (
+from projectkoios.references.courses.authority.evidence import (
     IngestionArtifactAuthorityLink,
+)
+from projectkoios.references.courses.authority.search_projection import (
     SearchReferenceAuthorityBinding,
     SearchReferenceAuthorityProjection,
 )
@@ -65,6 +67,7 @@ __all__: tuple[str, ...] = (
     "AuthorityBoundEvidenceAdmissionResult",
     "AuthorityBoundEvidenceOmission",
     "AuthorityBoundEvidenceOmissionReason",
+    "AuthorityBoundEvidenceRetrievalRequest",
     "AuthorityBoundEvidenceRetrievalResult",
 )
 
@@ -822,6 +825,79 @@ def _fresh_admission_result(
     return fresh
 
 
+def _fresh_evidence_retrieval_request(
+    value: EvidenceRetrievalRequest,
+) -> EvidenceRetrievalRequest:
+    if type(value) is not EvidenceRetrievalRequest:
+        raise TypeError("retrieval_request must be EvidenceRetrievalRequest")
+    fresh = EvidenceRetrievalRequest(
+        purpose=value.purpose,
+        query=value.query,
+        target_id=value.target_id,
+        bibliographic_work_ids=value.bibliographic_work_ids,
+        required_bibliographic_work_ids=(value.required_bibliographic_work_ids),
+        result_limit=value.result_limit,
+        per_work_limit=value.per_work_limit,
+        max_total_text_characters=value.max_total_text_characters,
+    )
+    if fresh != value:
+        raise AuthorityBoundEvidenceAdmissionError(
+            "lexical retrieval request is stale"
+        )
+    return fresh
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class AuthorityBoundEvidenceRetrievalRequest(DataObjectActionRequest):
+    """Bind exact accepted admission and bounded lexical request intent."""
+
+    CONTRACT_NAME: ClassVar[str] = "authority-bound-evidence-retrieval-request"
+    CONTRACT_VERSION: ClassVar[str] = "1.0"
+
+    admission: AuthorityBoundEvidenceAdmissionResult
+    retrieval_request: EvidenceRetrievalRequest
+    request_id: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        admission = _fresh_admission_result(self.admission)
+        retrieval_request = _fresh_evidence_retrieval_request(
+            self.retrieval_request
+        )
+        object.__setattr__(
+            self,
+            "request_id",
+            _identity(
+                namespace=self.CONTRACT_NAME,
+                material={
+                    "admission_result_id": admission.result_id,
+                    "contract_version": self.CONTRACT_VERSION,
+                    "reference_authority_result_id": (
+                        admission.request.reference_authority.result_id
+                    ),
+                    "retrieval_request_id": retrieval_request.request_id,
+                },
+            ),
+        )
+
+
+def _fresh_authority_retrieval_request(
+    value: AuthorityBoundEvidenceRetrievalRequest,
+) -> AuthorityBoundEvidenceRetrievalRequest:
+    if type(value) is not AuthorityBoundEvidenceRetrievalRequest:
+        raise TypeError(
+            "request must be AuthorityBoundEvidenceRetrievalRequest"
+        )
+    fresh = AuthorityBoundEvidenceRetrievalRequest(
+        admission=value.admission,
+        retrieval_request=value.retrieval_request,
+    )
+    if fresh != value:
+        raise AuthorityBoundEvidenceAdmissionError(
+            "authority retrieval request is stale"
+        )
+    return fresh
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class AuthorityBoundEvidenceRetrievalResult(DataObjectActionResult):
     """Bind one lexical result to exact accepted-authority admission."""
@@ -832,13 +908,14 @@ class AuthorityBoundEvidenceRetrievalResult(DataObjectActionResult):
         "projectkoios.search.authority-bound-deterministic-lexical-retriever"
     )
 
-    admission: AuthorityBoundEvidenceAdmissionResult
+    request: AuthorityBoundEvidenceRetrievalRequest
     retrieval: EvidenceRetrievalResult
     retriever_id: str
     result_id: str = field(init=False)
 
     def __post_init__(self) -> None:
-        admission = _fresh_admission_result(self.admission)
+        request = _fresh_authority_retrieval_request(self.request)
+        admission = request.admission
         if type(self.retrieval) is not EvidenceRetrievalResult:
             raise TypeError("retrieval must be EvidenceRetrievalResult")
         _require_identity(self.retriever_id, label="authority retriever ID")
@@ -852,7 +929,7 @@ class AuthorityBoundEvidenceRetrievalResult(DataObjectActionResult):
             )
         expected = DeterministicLexicalEvidenceRetriever(
             corpus=admission.corpus
-        ).action(request=self.retrieval.request)
+        ).action(request=request.retrieval_request)
         if self.retrieval != expected:
             raise AuthorityBoundEvidenceAdmissionError(
                 "retrieval differs from deterministic admitted corpus"
@@ -868,6 +945,7 @@ class AuthorityBoundEvidenceRetrievalResult(DataObjectActionResult):
                     "reference_authority_result_id": (
                         admission.request.reference_authority.result_id
                     ),
+                    "request_id": request.request_id,
                     "retrieval_result_id": self.retrieval.result_id,
                     "retriever_id": self.retriever_id,
                 },
@@ -877,39 +955,28 @@ class AuthorityBoundEvidenceRetrievalResult(DataObjectActionResult):
 
 class AuthorityBoundDeterministicLexicalEvidenceRetriever(
     DataObjectActionizer[
-        EvidenceRetrievalRequest,
+        AuthorityBoundEvidenceRetrievalRequest,
         AuthorityBoundEvidenceRetrievalResult,
     ]
 ):
-    """Retrieve only from an exact accepted-authority admission result."""
+    """Retrieve only from exact accepted-authority request values."""
 
-    __slots__ = ("_admission", "_delegate")
+    __slots__ = ()
 
     IMPLEMENTATION_ID: ClassVar[str] = (
         AuthorityBoundEvidenceRetrievalResult.RETRIEVER_ID
     )
 
-    def __init__(
-        self, *, admission: AuthorityBoundEvidenceAdmissionResult
-    ) -> None:
-        self._admission = _fresh_admission_result(admission)
-        self._delegate = DeterministicLexicalEvidenceRetriever(
-            corpus=self._admission.corpus
-        )
-
-    @property
-    def admission(self) -> AuthorityBoundEvidenceAdmissionResult:
-        """Return the exact production admission bound to this retriever."""
-        return self._admission
-
     def action(
-        self, *, request: EvidenceRetrievalRequest
+        self, *, request: AuthorityBoundEvidenceRetrievalRequest
     ) -> AuthorityBoundEvidenceRetrievalResult:
         """Return retrieval bound to accepted authority and its checkpoint."""
-        if type(request) is not EvidenceRetrievalRequest:
-            raise TypeError("request must be EvidenceRetrievalRequest")
+        request = _fresh_authority_retrieval_request(request)
+        delegate = DeterministicLexicalEvidenceRetriever(
+            corpus=request.admission.corpus
+        )
         return AuthorityBoundEvidenceRetrievalResult(
-            admission=self._admission,
-            retrieval=self._delegate.action(request=request),
+            request=request,
+            retrieval=delegate.action(request=request.retrieval_request),
             retriever_id=self.IMPLEMENTATION_ID,
         )

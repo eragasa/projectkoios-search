@@ -40,7 +40,7 @@ sequenceDiagram
     Request->>Composer: validated immutable inputs
     Composer->>Composer: exact field join and complete dispositions
     Composer-->>Caller: admission result and corpus
-    Caller->>Retriever: admission result (not raw corpus)
+    Caller->>Retriever: immutable admission + lexical Request
     Retriever->>Composer: replay admission
     Retriever-->>Caller: retrieval bound to admission and C
 ```
@@ -55,7 +55,21 @@ underlying deterministic retrieval result.
 
 References owns filesystem reobservation, typed linkage reload, and the
 `SearchReferenceAuthorityProjectionRequest` → actionizer → result production
-boundary in `projectkoios.references.courses.authority`. Search consumes only
-that exact result type and verifies that the supplied projection equals the
+boundary in
+`projectkoios.references.courses.authority.search_projection`. Search imports
+typed linkage only from its defining `courses.authority.evidence` leaf, consumes
+only the exact projection result type, and verifies that it equals the
 References checkpoint the caller declares current; Search neither reads assets
 nor fabricates freshness.
+
+## Encapsulation enforcement
+
+The production retriever is a stateless one-action `DataObjectActionizer`.
+Admission and lexical intent live in a frozen, slotted
+`AuthorityBoundEvidenceRetrievalRequest`; no constructor-held authority exists.
+Search's repository-local strict-mypy plugin is the authoritative architecture
+gate for this slice. It rejects private or nested classes, cross-module private
+imports, public helper functions, mutable passive fields, operational DataObject
+methods, stateful or multi-method Actionizers, multi-verb role classes, and
+classes outside the DataObject/Request/Result/Actionizer/enum/error/action-
+protocol taxonomy. Internal mechanics remain module-private pure functions.

@@ -14,8 +14,10 @@ from projectkoios.ingestion.page.projection.enrichment.actionizer import (
 from projectkoios.ingestion.page.projection.enrichment.request import (
     PageProjectionEvidenceEnrichmentRequest,
 )
-from projectkoios.references.courses.authority import (
+from projectkoios.references.courses.authority.evidence import (
     IngestionArtifactAuthorityLink,
+)
+from projectkoios.references.courses.authority.search_projection import (
     SearchReferenceAuthorityBinding,
     SearchReferenceAuthorityProjection,
 )
@@ -26,6 +28,7 @@ from projectkoios.search.authority_bound_evidence import (
     AuthorityBoundEvidenceAdmissionRequest,
     AuthorityBoundEvidenceAdmissionResult,
     AuthorityBoundEvidenceOmissionReason,
+    AuthorityBoundEvidenceRetrievalRequest,
 )
 from projectkoios.search.evidence_retrieval import (
     AuthoringPurpose,
@@ -545,11 +548,16 @@ def test__admission_result__rejects_changed_complete_output() -> None:
 
 def test__production_retriever__binds_admission_and_authority_result() -> None:
     admission = _admission()
-    result = AuthorityBoundDeterministicLexicalEvidenceRetriever(
-        admission=admission
-    ).action(request=_retrieval_request())
+    request = AuthorityBoundEvidenceRetrievalRequest(
+        admission=admission,
+        retrieval_request=_retrieval_request(),
+    )
+    result = AuthorityBoundDeterministicLexicalEvidenceRetriever().action(
+        request=request
+    )
 
-    assert result.admission == admission
+    assert result.request == request
+    assert result.request.admission == admission
     assert result.retrieval.outcome is (
         EvidenceRetrievalOutcome.EVIDENCE_AVAILABLE
     )
@@ -572,8 +580,41 @@ def test__production_retriever__rejects_raw_corpus() -> None:
         TypeError,
         match="AuthorityBoundEvidenceAdmissionResult",
     ):
-        AuthorityBoundDeterministicLexicalEvidenceRetriever(
+        AuthorityBoundEvidenceRetrievalRequest(
             admission=_admission().corpus,  # type: ignore[arg-type]
+            retrieval_request=_retrieval_request(),
+        )
+
+
+def test__production_retriever__rejects_mutated_lexical_request() -> None:
+    request = AuthorityBoundEvidenceRetrievalRequest(
+        admission=_admission(),
+        retrieval_request=_retrieval_request(),
+    )
+    object.__setattr__(request.retrieval_request, "query", "forged query")
+
+    with pytest.raises(
+        AuthorityBoundEvidenceAdmissionError,
+        match="lexical retrieval request is stale",
+    ):
+        AuthorityBoundDeterministicLexicalEvidenceRetriever().action(
+            request=request
+        )
+
+
+def test__production_retriever__rejects_mutated_admission_field() -> None:
+    request = AuthorityBoundEvidenceRetrievalRequest(
+        admission=_admission(),
+        retrieval_request=_retrieval_request(),
+    )
+    object.__setattr__(request, "admission", request.admission.corpus)
+
+    with pytest.raises(
+        TypeError,
+        match="AuthorityBoundEvidenceAdmissionResult",
+    ):
+        AuthorityBoundDeterministicLexicalEvidenceRetriever().action(
+            request=request
         )
 
 
@@ -616,5 +657,8 @@ def test__module__uses_exact_references_courses_authority_leaf() -> None:
         if value.startswith("projectkoios.references")
     )
 
-    assert references_imports == ("projectkoios.references.courses.authority",)
+    assert references_imports == (
+        "projectkoios.references.courses.authority.evidence",
+        "projectkoios.references.courses.authority.search_projection",
+    )
     assert "course_reference_authority" not in text

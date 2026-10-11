@@ -11,8 +11,9 @@ flowchart LR
     J -->|complete accepted binding| I[Evidence admission]
     J -->|missing, unavailable, inconsistent, over limit| O[Explicit omission]
     I --> P[REFERENCE_EVIDENCE corpus]
-    P --> R[Authority-bound lexical retriever]
-    C --> R
+    P --> T[Immutable authority retrieval request]
+    L[Bounded lexical request] --> T
+    T --> R[Stateless authority retrieval Actionizer]
     R --> X[Authority-bound retrieval result]
 ```
 

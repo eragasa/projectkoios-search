@@ -77,8 +77,9 @@ exact `PageProjectionChunkingResult`, public Ingestion page-projection
 enrichment, and an accepted References `SearchReferenceAuthorityProjection`
 matching an expected-current result ID. Missing, unavailable, stale, ambiguous,
 deferred, or candidate authority fails closed with explicit omissions. The
-production lexical retriever accepts only that admission result, never a raw
-candidate-capable `EvidenceCorpus`. These constraints do not remove prototype
+production lexical retriever accepts only an immutable request that binds that
+admission result to bounded lexical intent, never a raw candidate-capable
+`EvidenceCorpus`. These constraints do not remove prototype
 candidate support.
 
 ## Contract layers
