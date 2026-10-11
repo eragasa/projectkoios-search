@@ -1,0 +1,3 @@
+include scripts/authority_bound_architecture_mypy_plugin.py
+include tests/projectkoios/search/test__AuthorityBoundEvidenceAdmission.py
+recursive-include docs/architecture/projectkoios/search/authority_bound_evidence *.md

@@ -6,8 +6,9 @@ Only this module imports
 `projectkoios.ingestion.page.projection.result.PageProjectionResult`. The
 request requires that exact runtime type and reconstructs it through its public
 constructor before identity derivation. The action and result repeat freshness
-validation, so post-construction changes fail closed. No Search indexing or
-retrieval module imports Ingestion.
+validation, so post-construction changes fail closed. No Search indexing module
+imports Ingestion. The separate authority-admission module imports only the
+public Ingestion enrichment leaf and does not dereference producer graphs.
 
 ```mermaid
 classDiagram

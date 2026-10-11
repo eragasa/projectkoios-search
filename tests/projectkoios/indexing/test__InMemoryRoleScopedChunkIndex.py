@@ -171,9 +171,7 @@ def test__search__unsupported_purpose_fails_closed() -> None:
         UnsupportedRetrievalPurposeError,
         match="unsupported retrieval purpose",
     ):
-        populated_index().search(
-            request(RetrievalPurpose.LITERATURE_REVIEW)
-        )
+        populated_index().search(request(RetrievalPurpose.LITERATURE_REVIEW))
 
 
 def test__search__requires_record_level_purpose_admission() -> None:
