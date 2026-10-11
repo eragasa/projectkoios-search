@@ -190,6 +190,7 @@ def test__admission__requires_exact_current_reference_checkpoint() -> None:
 
 def test__admission__rejects_force_mutated_reference_result_identity() -> None:
     authority = _authority()
+    request = _request(authority=authority)
     changed = _content_id("search-reference-authority-result", "changed")
     object.__setattr__(authority, "result_id", changed)
 
@@ -197,7 +198,22 @@ def test__admission__rejects_force_mutated_reference_result_identity() -> None:
         AuthorityBoundEvidenceAdmissionError,
         match="reference authority identity is stale",
     ):
-        _request(authority=authority, expected_result_id=changed)
+        AuthorityBoundEvidenceAdmissionComposer().action(request=request)
+
+
+def test__admission__rejects_force_mutated_expected_checkpoint() -> None:
+    request = _request()
+    object.__setattr__(
+        request,
+        "expected_reference_authority_result_id",
+        _content_id("search-reference-authority-result", "forged"),
+    )
+
+    with pytest.raises(
+        AuthorityBoundEvidenceAdmissionError,
+        match="checkpoint is stale",
+    ):
+        AuthorityBoundEvidenceAdmissionComposer().action(request=request)
 
 
 @pytest.mark.parametrize(
@@ -286,6 +302,91 @@ def test__admission__rejects_force_mutated_reference_link(
     link = authority.bindings[0].ingestion_artifact_links[0]
     object.__setattr__(link, field_name, changed)
     assert authority.result_id == checkpoint
+
+    with pytest.raises(
+        AuthorityBoundEvidenceAdmissionError,
+        match="reference authority",
+    ):
+        AuthorityBoundEvidenceAdmissionComposer().action(request=request)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ("replacement", "removal", "duplication", "wrong-container"),
+)
+def test__admission__rejects_force_mutated_link_inventory(
+    mutation: str,
+) -> None:
+    authority = _authority()
+    request = _request(authority=authority)
+    binding = authority.bindings[0]
+    link = binding.ingestion_artifact_links[0]
+    replacement = IngestionArtifactAuthorityLink(
+        asset_observation_id=link.asset_observation_id,
+        source_id="source:replacement",
+        document_id=link.document_id,
+        artifact_verification_result_id=(link.artifact_verification_result_id),
+    )
+    changed: object
+    if mutation == "replacement":
+        changed = (replacement,)
+    elif mutation == "removal":
+        changed = ()
+    elif mutation == "duplication":
+        changed = (link, link)
+    else:
+        changed = [link]
+    object.__setattr__(binding, "ingestion_artifact_links", changed)
+
+    with pytest.raises(
+        AuthorityBoundEvidenceAdmissionError,
+        match="reference authority",
+    ):
+        AuthorityBoundEvidenceAdmissionComposer().action(request=request)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "review-projection-id",
+        "binding-replacement",
+        "binding-removal",
+        "binding-duplication",
+        "binding-wrong-container",
+        "projection-id",
+    ),
+)
+def test__admission__rejects_force_mutated_outer_projection(
+    mutation: str,
+) -> None:
+    authority = _authority()
+    request = _request(authority=authority)
+    original = authority.bindings[0]
+    replacement = replace(
+        original,
+        bibliographic_work_id=_content_id(
+            "bibliographic-work", "outer-replacement"
+        ),
+    )
+    if mutation == "review-projection-id":
+        field_name = "review_projection_id"
+        changed: object = _content_id("review-projection", "forged")
+    elif mutation == "binding-replacement":
+        field_name = "bindings"
+        changed = (replacement,)
+    elif mutation == "binding-removal":
+        field_name = "bindings"
+        changed = ()
+    elif mutation == "binding-duplication":
+        field_name = "bindings"
+        changed = (original, original)
+    elif mutation == "binding-wrong-container":
+        field_name = "bindings"
+        changed = [original]
+    else:
+        field_name = "projection_id"
+        changed = _content_id("search-reference-authority-projection", "forged")
+    object.__setattr__(authority, field_name, changed)
 
     with pytest.raises(
         AuthorityBoundEvidenceAdmissionError,
