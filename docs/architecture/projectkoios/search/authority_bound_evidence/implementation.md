@@ -21,8 +21,8 @@
 7. Emit an explicit omission for missing B, unavailable B, missing C, ambiguous
    or inconsistent bindings, and explicitly prechecked evidence-model bounds.
    Integrity or construction failures are never caught as `over_limit`.
-8. Replay the full join in result construction and when a production retriever
-   is constructed.
+8. Replay the full join when the authority retrieval request is constructed,
+   when the retrieval action executes, and during retrieval-result construction.
 
 ```mermaid
 sequenceDiagram
