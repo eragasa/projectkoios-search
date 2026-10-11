@@ -53,11 +53,7 @@ class InMemoryChunkIndex:
         return results[:limit]
 
     def _query_terms(self, query: str) -> list[str]:
-        return [
-            term
-            for term in query.lower().split()
-            if term
-        ]
+        return [term for term in query.lower().split() if term]
 
     def _score(
         self,
@@ -67,8 +63,4 @@ class InMemoryChunkIndex:
     ) -> int:
         text = chunk.text.lower()
 
-        return sum(
-            1
-            for term in query_terms
-            if term in text
-        )
+        return sum(1 for term in query_terms if term in text)

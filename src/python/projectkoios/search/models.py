@@ -121,9 +121,7 @@ class RoleScopedChunk:
             raise ValueError("record_id must be non-empty")
         if not isinstance(self.corpus_role, CorpusRole):
             raise ValueError("corpus role must be explicit")
-        if len(set(self.admitted_purposes)) != len(
-            self.admitted_purposes
-        ):
+        if len(set(self.admitted_purposes)) != len(self.admitted_purposes):
             raise ValueError("admitted retrieval purposes must be unique")
         if any(
             not isinstance(purpose, RetrievalPurpose)

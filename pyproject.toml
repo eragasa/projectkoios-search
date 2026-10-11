@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-projectkoios-ingestion = { git = "https://github.com/eragasa/projectkoios-ingestion.git", rev = "b146d684f07513f5a726457e7dd082e73edb50e0" }
+projectkoios-ingestion = { git = "https://github.com/eragasa/projectkoios-ingestion.git", rev = "82b09440708375abf34f8e3a8597a719dcd88cb7" }
 projectkoios-references = { git = "https://github.com/eragasa/projectkoios-references.git", rev = "1a7a0066b0116661c8bb688d494865d6e8797e0f" }
 
 [build-system]
