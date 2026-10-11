@@ -157,6 +157,56 @@ def _fresh_enrichment_result(
     return fresh
 
 
+def _fresh_reference_link(
+    value: IngestionArtifactAuthorityLink,
+) -> IngestionArtifactAuthorityLink:
+    if type(value) is not IngestionArtifactAuthorityLink:
+        raise TypeError("authority link must be IngestionArtifactAuthorityLink")
+    fresh = IngestionArtifactAuthorityLink(
+        asset_observation_id=value.asset_observation_id,
+        source_id=value.source_id,
+        document_id=value.document_id,
+        artifact_verification_result_id=(value.artifact_verification_result_id),
+    )
+    if fresh != value:
+        raise AuthorityBoundEvidenceAdmissionError(
+            "reference authority link identity is stale"
+        )
+    return fresh
+
+
+def _fresh_reference_binding(
+    value: SearchReferenceAuthorityBinding,
+) -> SearchReferenceAuthorityBinding:
+    if type(value) is not SearchReferenceAuthorityBinding:
+        raise TypeError(
+            "authority binding must be SearchReferenceAuthorityBinding"
+        )
+    if type(value.ingestion_artifact_links) is not tuple:
+        raise TypeError("authority links must be an immutable tuple")
+    links = tuple(
+        _fresh_reference_link(link) for link in value.ingestion_artifact_links
+    )
+    fresh = SearchReferenceAuthorityBinding(
+        candidate_id=value.candidate_id,
+        bibliographic_work_id=value.bibliographic_work_id,
+        reference_identity_status=value.reference_identity_status,
+        accepted_citekey=value.accepted_citekey,
+        source_asset_id=value.source_asset_id,
+        authority_binding_id=value.authority_binding_id,
+        identity_decision_id=value.identity_decision_id,
+        canonical_asset_decision_id=value.canonical_asset_decision_id,
+        ingestion_artifact_links=links,
+        authority_evidence_ids=value.authority_evidence_ids,
+        state_projection_id=value.state_projection_id,
+    )
+    if fresh != value:
+        raise AuthorityBoundEvidenceAdmissionError(
+            "reference authority binding identity is stale"
+        )
+    return fresh
+
+
 def _fresh_reference_authority(
     value: SearchReferenceAuthorityProjection,
 ) -> SearchReferenceAuthorityProjection:
@@ -165,11 +215,16 @@ def _fresh_reference_authority(
             "reference_authority must be SearchReferenceAuthorityProjection"
         )
     try:
+        if type(value.bindings) is not tuple:
+            raise TypeError("authority bindings must be an immutable tuple")
+        bindings = tuple(
+            _fresh_reference_binding(binding) for binding in value.bindings
+        )
         fresh = SearchReferenceAuthorityProjection(
             review_projection_id=value.review_projection_id,
-            bindings=value.bindings,
+            bindings=bindings,
         )
-    except (TypeError, ValueError) as error:
+    except (AttributeError, TypeError, ValueError) as error:
         raise AuthorityBoundEvidenceAdmissionError(
             "reference authority is stale or malformed"
         ) from error
@@ -230,6 +285,28 @@ class AuthorityBoundEvidenceAdmissionRequest(DataObjectActionRequest):
                 },
             ),
         )
+
+
+def _fresh_admission_request(
+    value: AuthorityBoundEvidenceAdmissionRequest,
+) -> AuthorityBoundEvidenceAdmissionRequest:
+    if type(value) is not AuthorityBoundEvidenceAdmissionRequest:
+        raise TypeError(
+            "request must be AuthorityBoundEvidenceAdmissionRequest"
+        )
+    fresh = AuthorityBoundEvidenceAdmissionRequest(
+        chunking_result=value.chunking_result,
+        enrichment_result=value.enrichment_result,
+        reference_authority=value.reference_authority,
+        expected_reference_authority_result_id=(
+            value.expected_reference_authority_result_id
+        ),
+    )
+    if fresh != value:
+        raise AuthorityBoundEvidenceAdmissionError(
+            "admission request identity is stale"
+        )
+    return fresh
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -364,6 +441,36 @@ def _link_matches_chunk(
         and link.document_id == chunk.document_id
         and link.artifact_verification_result_id
         == chunk.artifact_verification_result_id
+    )
+
+
+def _evidence_item_exceeds_limit(
+    *,
+    chunk: PageProjectionChunk,
+    enrichment: PageProjectionEvidenceEnrichment,
+    binding: SearchReferenceAuthorityBinding,
+) -> bool:
+    identity_values = (
+        binding.bibliographic_work_id,
+        binding.source_asset_id,
+        chunk.reading_projection_result_id,
+        chunk.source_page_id,
+        chunk.source_evidence_id,
+        *tuple(enrichment.source_span_ids),
+    )
+    return any(
+        len(value) > EvidenceItem.MAX_ID_CHARACTERS for value in identity_values
+    ) or any(
+        (
+            len(binding.accepted_citekey) > EvidenceItem.MAX_CITEKEY_CHARACTERS,
+            chunk.printed_page_label is not None
+            and len(chunk.printed_page_label)
+            > EvidenceItem.MAX_PRINTED_PAGE_LABEL_CHARACTERS,
+            len(enrichment.source_span_ids) > EvidenceItem.MAX_SOURCE_SPANS,
+            len(chunk.text) > EvidenceItem.MAX_INDEXED_TEXT_CHARACTERS,
+            len(enrichment.retained_text)
+            > EvidenceItem.MAX_RETAINED_TEXT_CHARACTERS,
+        )
     )
 
 
@@ -530,14 +637,11 @@ def _derive(
             )
             continue
         binding, link = matches[0]
-        try:
-            item = _evidence_item(
-                chunk=chunk,
-                enrichment=entry,
-                binding=binding,
-                link=link,
-            )
-        except ValueError:
+        if _evidence_item_exceeds_limit(
+            chunk=chunk,
+            enrichment=entry,
+            binding=binding,
+        ):
             omissions.append(
                 _omission(
                     chunk=chunk,
@@ -550,6 +654,32 @@ def _derive(
                 )
             )
             continue
+        try:
+            item = _evidence_item(
+                chunk=chunk,
+                enrichment=entry,
+                binding=binding,
+                link=link,
+            )
+        except AuthorityBoundEvidenceAdmissionError:
+            omissions.append(
+                _omission(
+                    chunk=chunk,
+                    reason=(
+                        AuthorityBoundEvidenceOmissionReason.INCONSISTENT_BINDING
+                    ),
+                    related_ids=(
+                        entry.enrichment_id,
+                        binding.binding_id,
+                        link.link_id,
+                    ),
+                )
+            )
+            continue
+        except (TypeError, ValueError) as error:
+            raise AuthorityBoundEvidenceAdmissionError(
+                "exact A+B+C values cannot construct EvidenceItem"
+            ) from error
         admissions.append(
             AuthorityBoundEvidenceAdmission(
                 item=item,
@@ -586,22 +716,7 @@ class AuthorityBoundEvidenceAdmissionResult(DataObjectActionResult):
     result_id: str = field(init=False)
 
     def __post_init__(self) -> None:
-        if type(self.request) is not AuthorityBoundEvidenceAdmissionRequest:
-            raise TypeError(
-                "request must be AuthorityBoundEvidenceAdmissionRequest"
-            )
-        fresh_request = AuthorityBoundEvidenceAdmissionRequest(
-            chunking_result=self.request.chunking_result,
-            enrichment_result=self.request.enrichment_result,
-            reference_authority=self.request.reference_authority,
-            expected_reference_authority_result_id=(
-                self.request.expected_reference_authority_result_id
-            ),
-        )
-        if fresh_request != self.request:
-            raise AuthorityBoundEvidenceAdmissionError(
-                "admission request identity is stale"
-            )
+        fresh_request = _fresh_admission_request(self.request)
         if type(self.admissions) is not tuple or any(
             type(value) is not AuthorityBoundEvidenceAdmission
             for value in self.admissions
@@ -615,7 +730,7 @@ class AuthorityBoundEvidenceAdmissionResult(DataObjectActionResult):
         if type(self.corpus) is not EvidenceCorpus:
             raise TypeError("corpus must be EvidenceCorpus")
         expected_admissions, expected_omissions, expected_corpus = _derive(
-            self.request
+            fresh_request
         )
         if (
             self.admissions != expected_admissions
@@ -676,10 +791,7 @@ class AuthorityBoundEvidenceAdmissionComposer(
         self, *, request: AuthorityBoundEvidenceAdmissionRequest
     ) -> AuthorityBoundEvidenceAdmissionResult:
         """Return the complete deterministic authority admission result."""
-        if type(request) is not AuthorityBoundEvidenceAdmissionRequest:
-            raise TypeError(
-                "request must be AuthorityBoundEvidenceAdmissionRequest"
-            )
+        request = _fresh_admission_request(request)
         admissions, omissions, corpus = _derive(request)
         return AuthorityBoundEvidenceAdmissionResult(
             request=request,

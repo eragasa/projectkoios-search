@@ -201,6 +201,100 @@ def test__admission__rejects_force_mutated_reference_result_identity() -> None:
 
 
 @pytest.mark.parametrize(
+    ("field_name", "changed"),
+    (
+        ("candidate_id", _content_id("reference-candidate", "forged")),
+        (
+            "bibliographic_work_id",
+            _content_id("bibliographic-work", "forged"),
+        ),
+        ("reference_identity_status", "candidate"),
+        ("accepted_citekey", "forgedBook"),
+        ("source_asset_id", _content_id("source-asset", "forged")),
+        (
+            "authority_binding_id",
+            _content_id("reference-source-asset-binding", "forged"),
+        ),
+        (
+            "identity_decision_id",
+            _content_id("human-review-decision", "forged-identity"),
+        ),
+        (
+            "canonical_asset_decision_id",
+            _content_id("human-review-decision", "forged-asset"),
+        ),
+        (
+            "authority_evidence_ids",
+            (_content_id("runtime-asset-evidence", "forged"),),
+        ),
+        (
+            "state_projection_id",
+            _content_id("reference-state-projection", "forged"),
+        ),
+        (
+            "binding_id",
+            _content_id("search-reference-authority-binding", "forged"),
+        ),
+    ),
+)
+def test__admission__rejects_force_mutated_reference_binding(
+    field_name: str,
+    changed: object,
+) -> None:
+    authority = _authority()
+    request = _request(authority=authority)
+    checkpoint = authority.result_id
+    object.__setattr__(authority.bindings[0], field_name, changed)
+    assert authority.result_id == checkpoint
+
+    with pytest.raises(
+        AuthorityBoundEvidenceAdmissionError,
+        match="reference authority",
+    ):
+        AuthorityBoundEvidenceAdmissionComposer().action(request=request)
+
+
+@pytest.mark.parametrize(
+    ("field_name", "changed"),
+    (
+        (
+            "asset_observation_id",
+            _content_id("catalog-asset-observation", "forged"),
+        ),
+        ("source_id", "source:forged-book"),
+        (
+            "document_id",
+            _content_id("reading-evidence-document", "forged"),
+        ),
+        (
+            "artifact_verification_result_id",
+            _content_id("managed-artifact-verification-result", "forged"),
+        ),
+        (
+            "link_id",
+            _content_id("ingestion-artifact-authority-link", "forged"),
+        ),
+    ),
+)
+def test__admission__rejects_force_mutated_reference_link(
+    field_name: str,
+    changed: str,
+) -> None:
+    authority = _authority()
+    request = _request(authority=authority)
+    checkpoint = authority.result_id
+    link = authority.bindings[0].ingestion_artifact_links[0]
+    object.__setattr__(link, field_name, changed)
+    assert authority.result_id == checkpoint
+
+    with pytest.raises(
+        AuthorityBoundEvidenceAdmissionError,
+        match="reference authority",
+    ):
+        AuthorityBoundEvidenceAdmissionComposer().action(request=request)
+
+
+@pytest.mark.parametrize(
     "authority",
     (
         _authority(source_id="source:other-book"),

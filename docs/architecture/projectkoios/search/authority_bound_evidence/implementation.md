@@ -4,8 +4,10 @@
 
 1. Replay Search chunking and public Ingestion enrichment from their exact
    requests; reject stale or force-mutated result objects.
-2. Reconstruct the References projection and require its result ID to equal the
-   caller-supplied expected-current checkpoint.
+2. Reconstruct every References typed artifact link from primitive fields,
+   reconstruct every binding from primitive fields and the replayed links, then
+   reconstruct the outer projection. Compare each replayed value and require the
+   final result ID to equal the caller-supplied expected-current checkpoint.
 3. Require A and B to name the same page-projection result and enforce the fixed
    100,000-chunk input bound.
 4. Index B by `source_evidence_id` and C by the exact tuple of `source_id`,
@@ -17,7 +19,8 @@
    authority values. Keep opaque Ingestion warnings on the admission provenance
    instead of translating them into Search warning semantics.
 7. Emit an explicit omission for missing B, unavailable B, missing C, ambiguous
-   or inconsistent bindings, and existing evidence-model bounds.
+   or inconsistent bindings, and explicitly prechecked evidence-model bounds.
+   Integrity or construction failures are never caught as `over_limit`.
 8. Replay the full join in result construction and when a production retriever
    is constructed.
 
