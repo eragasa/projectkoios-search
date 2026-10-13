@@ -12,8 +12,8 @@ from projectkoios.indexing.mongodb_page_projection_lexical import (
     MongoPageProjectionLexicalProjector,
     MongoPageProjectionLexicalRetriever,
 )
+from projectkoios.search.page_projection_chunking import PageProjectionChunk
 from projectkoios.search.page_projection_lexical import (
-    PageProjectionLexicalChunk,
     PageProjectionLexicalSearchRequest,
 )
 from pymongo.database import Database
@@ -33,7 +33,7 @@ def _database() -> Database[MongoDocument]:
 
 def _active_retriever() -> tuple[
     MongoPageProjectionLexicalRetriever,
-    tuple[PageProjectionLexicalChunk, ...],
+    tuple[PageProjectionChunk, ...],
 ]:
     """Stage and activate the exact two-chunk producer fixture.
 
@@ -44,10 +44,7 @@ def _active_retriever() -> tuple[
     """
 
     database = _database()
-    chunks = cast(
-        tuple[PageProjectionLexicalChunk, ...],
-        tuple(derive_chunking_result().chunks),
-    )
+    chunks = tuple(derive_chunking_result().chunks)
     projector = MongoPageProjectionLexicalProjector(
         database=database,
         storage_target_id="projectkoios.search.mongodb.development",
@@ -126,10 +123,7 @@ def test__stage__counts_repeated_term_once_for_document_frequency() -> None:
     """Keep posting term frequency while counting one document occurrence."""
 
     database = _database()
-    chunks = cast(
-        tuple[PageProjectionLexicalChunk, ...],
-        tuple(derive_chunking_result().chunks),
-    )
+    chunks = tuple(derive_chunking_result().chunks)
     repeated = replace(chunks[0], text="repeat repeat other")
     projector = MongoPageProjectionLexicalProjector(
         database=database,

@@ -12,6 +12,7 @@ from projectkoios.indexing.mongodb_page_projection_lexical import (
     MongoPageProjectionLexicalError,
     MongoPageProjectionLexicalProjector,
 )
+from projectkoios.search.page_projection_chunking import PageProjectionChunk
 from projectkoios.search.page_projection_lexical import (
     PageProjectionLexicalChunk,
 )
@@ -39,16 +40,16 @@ def _database(name: str) -> Database[MongoDocument]:
         Injected database capability with no network or credentials.
     """
 
-    client = mongomock.MongoClient()
+    client: mongomock.MongoClient[MongoDocument] = mongomock.MongoClient()
     return cast(Database[MongoDocument], client[name])
 
 
-def _chunks() -> tuple[PageProjectionLexicalChunk, ...]:
+def _chunks() -> tuple[PageProjectionChunk, ...]:
     """Return exact Search ``PageProjectionChunk`` outputs structurally.
 
     Returns
     -------
-    tuple[PageProjectionLexicalChunk, ...]
+    tuple[PageProjectionChunk, ...]
         Paragraph and figure-caption chunks from the frozen producer fixture.
     """
 
@@ -56,7 +57,7 @@ def _chunks() -> tuple[PageProjectionLexicalChunk, ...]:
     assert all(
         isinstance(value, PageProjectionLexicalChunk) for value in values
     )
-    return cast(tuple[PageProjectionLexicalChunk, ...], values)
+    return values
 
 
 def _generation_documents(
