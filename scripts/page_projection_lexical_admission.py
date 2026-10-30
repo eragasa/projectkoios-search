@@ -30,6 +30,7 @@ from projectkoios.search.page_projection_chunking import (
     PageProjectionChunk,
     PageProjectionChunker,
     PageProjectionChunkingRequest,
+    PageProjectionChunkInventory,
     PageProjectionChunkStyle,
 )
 from projectkoios.search.page_projection_lexical import (
@@ -77,16 +78,26 @@ _COMMON_ARGUMENT_NAMES: Final[tuple[str, ...]] = (
     "--maximum-payload-bytes",
     "--expected-load-request-id",
     "--expected-load-result-id",
+    "--expected-source-page-count",
+    "--expected-source-chunk-count",
+    "--physical-page-index-first",
+    "--physical-page-index-last",
+    "--expected-page-inventory-sha256",
+    "--expected-block-identity-inventory-sha256",
+    "--expected-enrichment-identity-inventory-sha256",
     "--expected-page-count",
     "--expected-chunk-count",
+    "--expected-document-text-utf8-bytes",
     "--expected-enrichment-available-count",
     "--expected-enrichment-unavailable-count",
     "--expected-paragraph-count",
     "--expected-heading-count",
     "--expected-figure-caption-count",
     "--expected-chunking-request-id",
+    "--expected-source-chunk-inventory-id",
     "--expected-chunk-inventory-id",
     "--expected-chunking-result-id",
+    "--expected-chunk-selection-id",
     "--expected-document-chunk-manifest-sha256",
     "--smoke-query",
     "--smoke-limit",
@@ -112,26 +123,36 @@ _PRELIGHT_SUCCESS_KEYS: Final[frozenset[str]] = frozenset(
         "active_state",
         "added_chunk_count",
         "capability_id",
+        "block_identity_inventory_sha256",
         "chunk_inventory_id",
+        "chunk_selection_id",
         "chunking_request_id",
         "chunking_result_id",
         "database_name",
         "document_chunk_count",
         "document_chunk_manifest_sha256",
         "document_style_counts",
+        "document_text_utf8_bytes",
         "enrichment_available_count",
+        "enrichment_identity_inventory_sha256",
         "enrichment_result_id",
         "enrichment_unavailable_count",
         "load_request_id",
         "load_result_id",
         "overlapping_chunk_count",
         "page_count",
+        "page_inventory_sha256",
         "page_projection_result_id",
+        "physical_page_index_first",
+        "physical_page_index_last",
         "phase",
         "preflight_id",
         "publication_id",
         "schema_id",
         "status",
+        "source_chunk_count",
+        "source_chunk_inventory_id",
+        "source_page_count",
         "storage_target_id",
         "tokenizer_id",
         "union_chunk_count",
@@ -156,6 +177,7 @@ _ADMISSION_SUCCESS_KEYS: Final[frozenset[str]] = frozenset(
         "admission_result_id",
         "capability_id",
         "chunk_inventory_id",
+        "chunk_selection_id",
         "chunking_result_id",
         "corpus_id",
         "database_name",
@@ -167,6 +189,8 @@ _ADMISSION_SUCCESS_KEYS: Final[frozenset[str]] = frozenset(
         "overlapping_chunk_count",
         "page_projection_result_id",
         "phase",
+        "physical_page_index_first",
+        "physical_page_index_last",
         "pointer_changed",
         "posting_count",
         "preserved_chunk_count",
@@ -300,16 +324,26 @@ class AdmissionArguments:
     maximum_payload_bytes: int
     expected_load_request_id: str
     expected_load_result_id: str
+    expected_source_page_count: int
+    expected_source_chunk_count: int
+    physical_page_index_first: int
+    physical_page_index_last: int
+    expected_page_inventory_sha256: str
+    expected_block_identity_inventory_sha256: str
+    expected_enrichment_identity_inventory_sha256: str
     expected_page_count: int
     expected_chunk_count: int
+    expected_document_text_utf8_bytes: int
     expected_enrichment_available_count: int
     expected_enrichment_unavailable_count: int
     expected_paragraph_count: int
     expected_heading_count: int
     expected_figure_caption_count: int
     expected_chunking_request_id: str
+    expected_source_chunk_inventory_id: str
     expected_chunk_inventory_id: str
     expected_chunking_result_id: str
+    expected_chunk_selection_id: str
     expected_document_chunk_manifest_sha256: str
     smoke_query: str
     smoke_limit: int
@@ -327,9 +361,19 @@ class LoadedDocument:
     load_request_id: str
     load_result_id: str
     chunking_request_id: str
+    source_chunk_inventory_id: str
     chunk_inventory_id: str
     chunking_result_id: str
+    chunk_selection_id: str
+    source_page_count: int
+    source_chunk_count: int
+    physical_page_index_first: int
+    physical_page_index_last: int
+    page_inventory_sha256: str
+    block_identity_inventory_sha256: str
+    enrichment_identity_inventory_sha256: str
     page_count: int
+    document_text_utf8_bytes: int
     enrichment_available_count: int
     enrichment_unavailable_count: int
     chunks: tuple[PageProjectionChunk, ...]
@@ -441,6 +485,61 @@ def parse_arguments(
             minimum=1,
             maximum=1_000_000,
         )
+    source_page_count = _require_int(
+        raw["--expected-source-page-count"], minimum=1, maximum=1_000_000
+    )
+    source_chunk_count = _require_int(
+        raw["--expected-source-chunk-count"], minimum=1, maximum=1_000_000
+    )
+    page_index_first = _require_int(
+        raw["--physical-page-index-first"], minimum=0, maximum=999_999
+    )
+    page_index_last = _require_int(
+        raw["--physical-page-index-last"], minimum=0, maximum=999_999
+    )
+    selected_page_count = _require_int(
+        raw["--expected-page-count"], minimum=1, maximum=1_000_000
+    )
+    selected_chunk_count = _require_int(
+        raw["--expected-chunk-count"], minimum=1, maximum=1_000_000
+    )
+    available_count = _require_int(
+        raw["--expected-enrichment-available-count"],
+        minimum=0,
+        maximum=1_000_000,
+    )
+    unavailable_count = _require_int(
+        raw["--expected-enrichment-unavailable-count"],
+        minimum=0,
+        maximum=1_000_000,
+    )
+    style_count = sum(
+        _require_int(raw[name], minimum=0, maximum=1_000_000)
+        for name in (
+            "--expected-paragraph-count",
+            "--expected-heading-count",
+            "--expected-figure-caption-count",
+        )
+    )
+    if (
+        page_index_first > page_index_last
+        or page_index_last >= source_page_count
+        or selected_page_count != page_index_last - page_index_first + 1
+        or selected_chunk_count > source_chunk_count
+        or available_count + unavailable_count != selected_chunk_count
+        or style_count != selected_chunk_count
+        or _require_int(
+            raw["--maximum-payload-bytes"],
+            minimum=1,
+            maximum=1_000_000_000,
+        )
+        != _require_int(
+            raw["--payload-byte-length"],
+            minimum=1,
+            maximum=1_000_000_000,
+        )
+    ):
+        raise AdmissionInvocationError
     return AdmissionArguments(
         publication_root=publication_root,
         source_sha256=_require_sha256(raw["--source-sha256"]),
@@ -494,11 +593,45 @@ def parse_arguments(
             raw["--expected-load-result-id"],
             prefix="page-projection-publication-load-result:sha256:",
         ),
+        expected_source_page_count=_require_int(
+            raw["--expected-source-page-count"],
+            minimum=1,
+            maximum=1_000_000,
+        ),
+        expected_source_chunk_count=_require_int(
+            raw["--expected-source-chunk-count"],
+            minimum=1,
+            maximum=1_000_000,
+        ),
+        physical_page_index_first=_require_int(
+            raw["--physical-page-index-first"],
+            minimum=0,
+            maximum=999_999,
+        ),
+        physical_page_index_last=_require_int(
+            raw["--physical-page-index-last"],
+            minimum=0,
+            maximum=999_999,
+        ),
+        expected_page_inventory_sha256=_require_sha256(
+            raw["--expected-page-inventory-sha256"]
+        ),
+        expected_block_identity_inventory_sha256=_require_sha256(
+            raw["--expected-block-identity-inventory-sha256"]
+        ),
+        expected_enrichment_identity_inventory_sha256=_require_sha256(
+            raw["--expected-enrichment-identity-inventory-sha256"]
+        ),
         expected_page_count=_require_int(
             raw["--expected-page-count"], minimum=1, maximum=1_000_000
         ),
         expected_chunk_count=_require_int(
             raw["--expected-chunk-count"], minimum=1, maximum=1_000_000
+        ),
+        expected_document_text_utf8_bytes=_require_int(
+            raw["--expected-document-text-utf8-bytes"],
+            minimum=1,
+            maximum=1_000_000_000,
         ),
         expected_enrichment_available_count=_require_int(
             raw["--expected-enrichment-available-count"],
@@ -525,6 +658,10 @@ def parse_arguments(
             raw["--expected-chunking-request-id"],
             prefix="page-projection-chunking-request:sha256:",
         ),
+        expected_source_chunk_inventory_id=_require_identity(
+            raw["--expected-source-chunk-inventory-id"],
+            prefix="page-projection-chunk-inventory:sha256:",
+        ),
         expected_chunk_inventory_id=_require_identity(
             raw["--expected-chunk-inventory-id"],
             prefix="page-projection-chunk-inventory:sha256:",
@@ -532,6 +669,10 @@ def parse_arguments(
         expected_chunking_result_id=_require_identity(
             raw["--expected-chunking-result-id"],
             prefix="page-projection-chunking-result:sha256:",
+        ),
+        expected_chunk_selection_id=_require_identity(
+            raw["--expected-chunk-selection-id"],
+            prefix="page-projection-chunk-selection:sha256:",
         ),
         expected_document_chunk_manifest_sha256=_require_sha256(
             raw["--expected-document-chunk-manifest-sha256"]
@@ -585,11 +726,72 @@ def read_connection_uri() -> str:
     return connection_uri
 
 
+def _inventory_digest(material: object) -> str:
+    """Hash one exact canonical owner-native inventory material value."""
+
+    encoded = json.dumps(
+        material,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8", errors="strict")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _chunk_selection_id(
+    *,
+    chunking_result_id: str,
+    source_chunk_inventory_id: str,
+    chunk_inventory_id: str,
+    physical_page_index_first: int,
+    physical_page_index_last: int,
+    page_inventory_sha256: str,
+    block_identity_inventory_sha256: str,
+    enrichment_identity_inventory_sha256: str,
+    chunk_manifest_sha256: str,
+    page_count: int,
+    chunk_count: int,
+    document_text_utf8_bytes: int,
+) -> str:
+    """Bind a complete deterministic physical-page chunk selection."""
+
+    digest = _inventory_digest(
+        {
+            "block_identity_inventory_sha256": (
+                block_identity_inventory_sha256
+            ),
+            "chunk_count": chunk_count,
+            "chunk_inventory_id": chunk_inventory_id,
+            "chunk_manifest_sha256": chunk_manifest_sha256,
+            "chunking_result_id": chunking_result_id,
+            "document_text_utf8_bytes": document_text_utf8_bytes,
+            "enrichment_identity_inventory_sha256": (
+                enrichment_identity_inventory_sha256
+            ),
+            "page_count": page_count,
+            "page_inventory_sha256": page_inventory_sha256,
+            "physical_page_index_first": physical_page_index_first,
+            "physical_page_index_last": physical_page_index_last,
+            "source_chunk_inventory_id": source_chunk_inventory_id,
+            "type": "projectkoios.search.page-projection-chunk-selection",
+            "version": "1.0",
+        }
+    )
+    return f"page-projection-chunk-selection:sha256:{digest}"
+
+
 def validate_document_inventory(
     *,
     arguments: AdmissionArguments,
+    source_page_count: int,
+    source_chunk_count: int,
+    source_chunk_inventory_id: str,
     page_count: int,
     block_count: int,
+    document_text_utf8_bytes: int,
+    page_inventory_sha256: str,
+    block_identity_inventory_sha256: str,
+    enrichment_identity_inventory_sha256: str,
     enrichment_available_count: int,
     enrichment_unavailable_count: int,
     chunk_count: int,
@@ -597,9 +799,10 @@ def validate_document_inventory(
     chunking_request_id: str,
     chunk_inventory_id: str,
     chunking_result_id: str,
+    chunk_selection_id: str,
     chunk_manifest_sha256: str,
 ) -> None:
-    """Require every operator-pinned current-schema inventory measure."""
+    """Require every operator-pinned source and selected inventory measure."""
 
     expected_style_counts = {
         "figure_caption": arguments.expected_figure_caption_count,
@@ -607,9 +810,20 @@ def validate_document_inventory(
         "paragraph": arguments.expected_paragraph_count,
     }
     if (
-        page_count != arguments.expected_page_count
+        source_page_count != arguments.expected_source_page_count
+        or source_chunk_count != arguments.expected_source_chunk_count
+        or source_chunk_inventory_id
+        != arguments.expected_source_chunk_inventory_id
+        or page_count != arguments.expected_page_count
         or block_count != arguments.expected_chunk_count
         or chunk_count != arguments.expected_chunk_count
+        or document_text_utf8_bytes
+        != arguments.expected_document_text_utf8_bytes
+        or page_inventory_sha256 != arguments.expected_page_inventory_sha256
+        or block_identity_inventory_sha256
+        != arguments.expected_block_identity_inventory_sha256
+        or enrichment_identity_inventory_sha256
+        != arguments.expected_enrichment_identity_inventory_sha256
         or enrichment_available_count
         != arguments.expected_enrichment_available_count
         or enrichment_unavailable_count
@@ -620,6 +834,7 @@ def validate_document_inventory(
         or chunking_request_id != arguments.expected_chunking_request_id
         or chunk_inventory_id != arguments.expected_chunk_inventory_id
         or chunking_result_id != arguments.expected_chunking_result_id
+        or chunk_selection_id != arguments.expected_chunk_selection_id
         or chunk_manifest_sha256
         != arguments.expected_document_chunk_manifest_sha256
     ):
@@ -638,6 +853,9 @@ def load_document(*, arguments: AdmissionArguments) -> LoadedDocument:
         )
         from projectkoios.ingestion.integrations.disk.page.projection.publication.load.runtime import (  # noqa: E501
             DiskPageProjectionPublicationLoadRuntime,
+        )
+        from projectkoios.ingestion.page.projection.enrichment.record import (  # noqa: E501
+            PageProjectionEvidenceEnrichment,
         )
         from projectkoios.ingestion.page.projection.publication.load.request import (  # noqa: E501
             PageProjectionPublicationLoadRequest,
@@ -699,42 +917,173 @@ def load_document(*, arguments: AdmissionArguments) -> LoadedDocument:
                 projection_result=loaded.projection
             )
         )
-        chunks = tuple(chunking.chunks)
+        source_chunks = tuple(chunking.chunks)
+        if len(loaded.enrichment.entries) != len(source_chunks):
+            raise AdmissionInventoryError
+        selected_pages = tuple(
+            page
+            for page in loaded.projection.pages
+            if arguments.physical_page_index_first
+            <= page.physical_page_index
+            <= arguments.physical_page_index_last
+        )
+        if tuple(page.physical_page_index for page in selected_pages) != tuple(
+            range(
+                arguments.physical_page_index_first,
+                arguments.physical_page_index_last + 1,
+            )
+        ):
+            raise AdmissionInventoryError
+        selected_page_ids = {page.page_id for page in selected_pages}
+        selected_blocks = tuple(
+            block for page in selected_pages for block in page.blocks
+        )
+        selected_block_ids = {block.block_id for block in selected_blocks}
+        chunks = tuple(
+            value
+            for value in source_chunks
+            if arguments.physical_page_index_first
+            <= value.physical_page_index
+            <= arguments.physical_page_index_last
+        )
+        if {
+            value.page_projection_block_id for value in chunks
+        } != selected_block_ids:
+            raise AdmissionInventoryError
+        selected_entries = tuple(
+            entry
+            for entry in loaded.enrichment.entries
+            if entry.page_projection_page_id in selected_page_ids
+        )
+        if {
+            entry.page_projection_block_id for entry in selected_entries
+        } != selected_block_ids or len(selected_entries) != len(
+            selected_block_ids
+        ):
+            raise AdmissionInventoryError
+        page_inventory = [
+            {
+                "block_count": len(page.blocks),
+                "block_inventory_id": page.blocks.inventory_id,
+                "page_id": page.page_id,
+                "page_location_id": page.page_location.location_id.value,
+                "physical_page_index": page.physical_page_index,
+                "physical_page_number": page.physical_page_number,
+                "printed_page_label": page.printed_page_label,
+                "projected_text_bytes": page.blocks.projected_text_bytes,
+                "source_page_id": page.source_page_id.value,
+            }
+            for page in selected_pages
+        ]
+        block_identity_inventory = [
+            {
+                "block_id": block.block_id,
+                "order_index": block.order_index,
+                "source_id": block.source_id.value,
+                "style": block.style.value,
+            }
+            for block in selected_blocks
+        ]
+        enrichment_identity_inventory = sorted(
+            (
+                {
+                    "entry_id": entry.entry_id,
+                    "page_projection_block_id": (
+                        entry.page_projection_block_id
+                    ),
+                    "page_projection_page_id": entry.page_projection_page_id,
+                    "source_evidence_id": entry.source_evidence_id,
+                }
+                for entry in selected_entries
+            ),
+            key=lambda value: value["page_projection_block_id"],
+        )
+        page_inventory_sha256 = _inventory_digest(page_inventory)
+        block_identity_inventory_sha256 = _inventory_digest(
+            block_identity_inventory
+        )
+        enrichment_identity_inventory_sha256 = _inventory_digest(
+            enrichment_identity_inventory
+        )
+        selected_inventory = PageProjectionChunkInventory(
+            page_projection_result_id=loaded.projection.result_id,
+            chunks=chunks,
+        )
         chunk_ids = tuple(value.chunk_id for value in chunks)
         style_counts = Counter(value.style.value for value in chunks)
         manifest_sha256 = PageProjectionLexicalIdentity.chunk_manifest_sha256(
             chunk_ids=chunk_ids
         )
+        text_utf8_bytes = sum(value.text_utf8_bytes for value in chunks)
+        if text_utf8_bytes != sum(
+            page.blocks.projected_text_bytes for page in selected_pages
+        ):
+            raise AdmissionInventoryError
+        selection_id = _chunk_selection_id(
+            chunking_result_id=chunking.result_id,
+            source_chunk_inventory_id=chunking.chunks.inventory_id,
+            chunk_inventory_id=selected_inventory.inventory_id,
+            physical_page_index_first=arguments.physical_page_index_first,
+            physical_page_index_last=arguments.physical_page_index_last,
+            page_inventory_sha256=page_inventory_sha256,
+            block_identity_inventory_sha256=(block_identity_inventory_sha256),
+            enrichment_identity_inventory_sha256=(
+                enrichment_identity_inventory_sha256
+            ),
+            chunk_manifest_sha256=manifest_sha256,
+            page_count=len(selected_pages),
+            chunk_count=len(chunks),
+            document_text_utf8_bytes=text_utf8_bytes,
+        )
+        available_count = sum(
+            type(entry) is PageProjectionEvidenceEnrichment
+            for entry in selected_entries
+        )
+        unavailable_count = len(selected_entries) - available_count
         validate_document_inventory(
             arguments=arguments,
-            page_count=len(loaded.projection.pages),
-            block_count=loaded.projection.pages.block_count,
-            enrichment_available_count=(
-                loaded.enrichment.entries.available_count
+            source_page_count=len(loaded.projection.pages),
+            source_chunk_count=len(source_chunks),
+            source_chunk_inventory_id=chunking.chunks.inventory_id,
+            page_count=len(selected_pages),
+            block_count=len(selected_blocks),
+            document_text_utf8_bytes=text_utf8_bytes,
+            page_inventory_sha256=page_inventory_sha256,
+            block_identity_inventory_sha256=(block_identity_inventory_sha256),
+            enrichment_identity_inventory_sha256=(
+                enrichment_identity_inventory_sha256
             ),
-            enrichment_unavailable_count=(
-                loaded.enrichment.entries.unavailable_count
-            ),
+            enrichment_available_count=available_count,
+            enrichment_unavailable_count=unavailable_count,
             chunk_count=len(chunks),
             style_counts=dict(style_counts),
             chunking_request_id=chunking.request.request_id,
-            chunk_inventory_id=chunking.chunks.inventory_id,
+            chunk_inventory_id=selected_inventory.inventory_id,
             chunking_result_id=chunking.result_id,
+            chunk_selection_id=selection_id,
             chunk_manifest_sha256=manifest_sha256,
         )
         return LoadedDocument(
             load_request_id=request.request_id,
             load_result_id=loaded.result_id,
             chunking_request_id=chunking.request.request_id,
-            chunk_inventory_id=chunking.chunks.inventory_id,
+            source_chunk_inventory_id=chunking.chunks.inventory_id,
+            chunk_inventory_id=selected_inventory.inventory_id,
             chunking_result_id=chunking.result_id,
-            page_count=len(loaded.projection.pages),
-            enrichment_available_count=(
-                loaded.enrichment.entries.available_count
+            chunk_selection_id=selection_id,
+            source_page_count=len(loaded.projection.pages),
+            source_chunk_count=len(source_chunks),
+            physical_page_index_first=arguments.physical_page_index_first,
+            physical_page_index_last=arguments.physical_page_index_last,
+            page_inventory_sha256=page_inventory_sha256,
+            block_identity_inventory_sha256=(block_identity_inventory_sha256),
+            enrichment_identity_inventory_sha256=(
+                enrichment_identity_inventory_sha256
             ),
-            enrichment_unavailable_count=(
-                loaded.enrichment.entries.unavailable_count
-            ),
+            page_count=len(selected_pages),
+            document_text_utf8_bytes=text_utf8_bytes,
+            enrichment_available_count=available_count,
+            enrichment_unavailable_count=unavailable_count,
             chunks=chunks,
             style_counts=dict(sorted(style_counts.items())),
             chunk_manifest_sha256=manifest_sha256,
@@ -972,28 +1321,42 @@ def preflight_record(
         **_snapshot_fields(snapshot),
         "active_projection_chunk_counts": projection_counts(plan.active_chunks),
         "added_chunk_count": plan.added_chunk_count,
+        "block_identity_inventory_sha256": (
+            document.block_identity_inventory_sha256
+        ),
         "capability_id": CAPABILITY_ID,
         "chunk_inventory_id": document.chunk_inventory_id,
+        "chunk_selection_id": document.chunk_selection_id,
         "chunking_request_id": document.chunking_request_id,
         "chunking_result_id": document.chunking_result_id,
         "database_name": DATABASE_NAME,
         "document_chunk_count": len(document.chunks),
         "document_chunk_manifest_sha256": document.chunk_manifest_sha256,
         "document_style_counts": document.style_counts,
+        "document_text_utf8_bytes": document.document_text_utf8_bytes,
         "enrichment_available_count": document.enrichment_available_count,
+        "enrichment_identity_inventory_sha256": (
+            document.enrichment_identity_inventory_sha256
+        ),
         "enrichment_result_id": enrichment_result_id,
         "enrichment_unavailable_count": document.enrichment_unavailable_count,
         "load_request_id": document.load_request_id,
         "load_result_id": document.load_result_id,
         "overlapping_chunk_count": plan.overlapping_chunk_count,
         "page_count": document.page_count,
+        "page_inventory_sha256": document.page_inventory_sha256,
         "page_projection_result_id": document.chunks[
             0
         ].page_projection_result_id,
+        "physical_page_index_first": document.physical_page_index_first,
+        "physical_page_index_last": document.physical_page_index_last,
         "phase": "read-only-preflight",
         "preflight_id": "",
         "publication_id": publication_id,
         "schema_id": projector.SCHEMA_ID,
+        "source_chunk_count": document.source_chunk_count,
+        "source_chunk_inventory_id": document.source_chunk_inventory_id,
+        "source_page_count": document.source_page_count,
         "status": "verified",
         "storage_target_id": STORAGE_TARGET_ID,
         "tokenizer_id": projector._tokenizer.tokenizer_id,
@@ -1107,10 +1470,17 @@ def admission_record(
         generation=plan.generation,
         hits=retrieval.hits,
     )
-    if not any(
-        value["page_projection_result_id"]
-        == arguments.page_projection_result_id
+    target_locators = tuple(
+        value
         for value in locators
+        if value["page_projection_result_id"]
+        == arguments.page_projection_result_id
+    )
+    if not target_locators or any(
+        not arguments.physical_page_index_first
+        <= cast(int, value["physical_page_index"])
+        <= arguments.physical_page_index_last
+        for value in target_locators
     ):
         raise AdmissionRetrievalError
     validated_after = projector.active_snapshot()
@@ -1142,6 +1512,7 @@ def admission_record(
         "admission_result_id": "",
         "capability_id": CAPABILITY_ID,
         "chunk_inventory_id": document.chunk_inventory_id,
+        "chunk_selection_id": document.chunk_selection_id,
         "chunking_result_id": document.chunking_result_id,
         "corpus_id": plan.generation.corpus_id,
         "database_name": DATABASE_NAME,
@@ -1153,6 +1524,8 @@ def admission_record(
         "overlapping_chunk_count": plan.overlapping_chunk_count,
         "page_projection_result_id": arguments.page_projection_result_id,
         "phase": "admission",
+        "physical_page_index_first": document.physical_page_index_first,
+        "physical_page_index_last": document.physical_page_index_last,
         "pointer_changed": pointer_changed,
         "posting_count": plan.generation.posting_count,
         "preserved_chunk_count": len(plan.active_chunks),

@@ -101,12 +101,24 @@ The repository owns two bounded development-only modules:
 `scripts.preflight_page_projection_lexical_admission` and
 `scripts.admit_page_projection_lexical_publication`. Both use Ingestion's exact
 pinned typed publication loader and Search's production chunker; neither decodes
-upstream publication JSON. The preflight is read-only: it reconstructs the
-complete active corpus, verifies every stored chunk, derives the deterministic
-union generation, and reports the expected active generation and pointer
-revision. The admission command requires those exact values plus the expected
-union generation, rederives all evidence, reobserves the pointer before staging,
-stages one immutable union, and activates only through the revision-bound CAS.
+upstream publication JSON. The command first chunks the complete typed
+projection without filtering. It then selects one explicit inclusive physical
+page-index window. The invocation binds the complete source page/chunk counts
+and source chunk inventory as well as the selected page range, canonical page,
+block, and enrichment inventory digests, selected chunk inventory and manifest,
+UTF-8 text-byte count, style/enrichment counts, and a derived
+`page-projection-chunk-selection` identity. A complete publication uses its full
+physical range through the same contract. Text matching is never a selection
+mechanism. Missing, repeated, noncontiguous, or out-of-range pages; incomplete
+enrichment coverage; or any source/selection inventory drift fails before a
+Mongo client is created.
+
+The preflight is read-only: it reconstructs the complete active corpus, verifies
+every stored chunk, derives the deterministic union generation, and reports the
+expected active generation and pointer revision. The admission command requires
+those exact values plus the expected union generation, rederives all evidence,
+reobserves the pointer before staging, stages one immutable union, and activates
+only through the revision-bound CAS.
 
 An already-active identical union is a verified replay and does not increment
 the pointer. Every success then replays immutable staging in reverse input
@@ -120,16 +132,18 @@ argv, environment, file, or output. Output is one canonical redacted JSON line
 bounded to 65,536 bytes.
 
 The preflight success record has exact keys `status`, `phase`, fixed target and
-schema identities, typed-load/chunking/publication identities, exact document
-page/chunk/enrichment/style measures, active generation/corpus/index/manifest
-and pointer-revision fields, bounded per-projection counts, added/overlap
+schema identities, typed-load/chunking/publication and physical-window selection
+identities, exact source and selected page/chunk/enrichment/style/text-byte
+measures and inventory digests, active generation/corpus/index/manifest and
+pointer-revision fields, bounded per-projection counts, added/overlap
 counts, complete prospective union identities and measures, and a derived
 `preflight_id`. Active fields are nullable only when `active_state` is exactly
 `absent`.
 
 The admission success record has exact keys `status`, `phase`, `disposition`,
-fixed target and schema identities, publication/load/chunking/projection
-identities, before/after generation and revision, pointer-change evidence,
+fixed target and schema identities, publication/load/chunking/projection and
+physical-window selection identities, before/after generation and revision,
+pointer-change evidence,
 preserved/added/overlap/union counts, complete union generation/corpus/index
 identities and measures, before/after per-projection counts, replay generation
 and revision, deterministic retrieval/replay result identities, request

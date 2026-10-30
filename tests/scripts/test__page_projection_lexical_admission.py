@@ -63,8 +63,16 @@ def _arguments() -> admission.AdmissionArguments:
         expected_load_result_id=(
             "page-projection-publication-load-result:sha256:" + "5" * 64
         ),
+        expected_source_page_count=780,
+        expected_source_chunk_count=16_985,
+        physical_page_index_first=0,
+        physical_page_index_last=779,
+        expected_page_inventory_sha256="a" * 64,
+        expected_block_identity_inventory_sha256="b" * 64,
+        expected_enrichment_identity_inventory_sha256="c" * 64,
         expected_page_count=780,
         expected_chunk_count=16_985,
+        expected_document_text_utf8_bytes=1_504_992,
         expected_enrichment_available_count=16_985,
         expected_enrichment_unavailable_count=0,
         expected_paragraph_count=16_985,
@@ -73,11 +81,17 @@ def _arguments() -> admission.AdmissionArguments:
         expected_chunking_request_id=(
             "page-projection-chunking-request:sha256:" + "6" * 64
         ),
+        expected_source_chunk_inventory_id=(
+            "page-projection-chunk-inventory:sha256:" + "7" * 64
+        ),
         expected_chunk_inventory_id=(
             "page-projection-chunk-inventory:sha256:" + "7" * 64
         ),
         expected_chunking_result_id=(
             "page-projection-chunking-result:sha256:" + "8" * 64
+        ),
+        expected_chunk_selection_id=(
+            "page-projection-chunk-selection:sha256:" + "d" * 64
         ),
         expected_document_chunk_manifest_sha256="9" * 64,
         smoke_query="matrix computations golub van loan",
@@ -95,9 +109,19 @@ def _loaded_target() -> admission.LoadedDocument:
         load_request_id="load-request",
         load_result_id="load-result",
         chunking_request_id="chunking-request",
+        source_chunk_inventory_id="source-chunk-inventory",
         chunk_inventory_id="chunk-inventory",
         chunking_result_id="chunking-result",
+        chunk_selection_id="chunk-selection",
+        source_page_count=1,
+        source_chunk_count=1,
+        physical_page_index_first=target.physical_page_index,
+        physical_page_index_last=target.physical_page_index,
+        page_inventory_sha256="a" * 64,
+        block_identity_inventory_sha256="b" * 64,
+        enrichment_identity_inventory_sha256="c" * 64,
         page_count=1,
+        document_text_utf8_bytes=target.text_utf8_bytes,
         enrichment_available_count=1,
         enrichment_unavailable_count=0,
         chunks=(target,),
@@ -341,6 +365,49 @@ def test__run_admission__activates_then_replays_without_pointer_increment(
     )
 
 
+def test__admission_record__rejects_target_locator_outside_window() -> None:
+    database = _database("retrieval-window")
+    projector = MongoPageProjectionLexicalProjector(
+        database=database,
+        storage_target_id=admission.STORAGE_TARGET_ID,
+    )
+    document = _loaded_target()
+    before = projector.active_snapshot()
+    plan = admission.union_plan(
+        projector=projector,
+        snapshot=before,
+        document=document,
+    )
+    generation = projector.stage(chunks=plan.union_chunks)
+    projector.activate(
+        generation=generation,
+        expected_active_generation_id=None,
+        expected_active_pointer_revision=None,
+    )
+    outside = document.chunks[0].physical_page_index + 1
+    arguments = replace(
+        _arguments(),
+        page_projection_result_id=(
+            document.chunks[0].page_projection_result_id
+        ),
+        physical_page_index_first=outside,
+        physical_page_index_last=outside,
+        smoke_query="figure",
+    )
+
+    with pytest.raises(admission.AdmissionRetrievalError):
+        admission.admission_record(
+            arguments=arguments,
+            database=database,
+            projector=projector,
+            before=before,
+            after=projector.active_snapshot(),
+            document=document,
+            plan=plan,
+            replay_generation=generation,
+        )
+
+
 def test__admission_record__rejects_pointer_aba_during_retrieval(
     monkeypatch: pytest.MonkeyPatch,
     capfd: pytest.CaptureFixture[str],
@@ -448,13 +515,55 @@ def test__admission_record__rejects_pointer_aba_during_retrieval(
     assert projector.active_snapshot().pointer_revision == 3
 
 
-def test__exact_golub_inventory_gate_accepts_only_all_pinned_counts() -> None:
+def test__chunk_selection_identity_binds_window_and_all_inventories() -> None:
+    values = {
+        "chunking_result_id": "page-projection-chunking-result:sha256:"
+        + "1" * 64,
+        "source_chunk_inventory_id": (
+            "page-projection-chunk-inventory:sha256:" + "2" * 64
+        ),
+        "chunk_inventory_id": (
+            "page-projection-chunk-inventory:sha256:" + "3" * 64
+        ),
+        "physical_page_index_first": 133,
+        "physical_page_index_last": 168,
+        "page_inventory_sha256": "4" * 64,
+        "block_identity_inventory_sha256": "5" * 64,
+        "enrichment_identity_inventory_sha256": "6" * 64,
+        "chunk_manifest_sha256": "7" * 64,
+        "page_count": 36,
+        "chunk_count": 652,
+        "document_text_utf8_bytes": 75_068,
+    }
+    identity = admission._chunk_selection_id(**values)
+
+    assert identity == admission._chunk_selection_id(**values)
+    assert identity != admission._chunk_selection_id(
+        **{**values, "physical_page_index_last": 169}
+    )
+    assert identity != admission._chunk_selection_id(
+        **{**values, "enrichment_identity_inventory_sha256": "8" * 64}
+    )
+
+
+def test__source_and_selected_inventory_gate_accepts_only_all_pins() -> None:
     arguments = _arguments()
 
     admission.validate_document_inventory(
         arguments=arguments,
+        source_page_count=780,
+        source_chunk_count=16_985,
+        source_chunk_inventory_id=arguments.expected_source_chunk_inventory_id,
         page_count=780,
         block_count=16_985,
+        document_text_utf8_bytes=1_504_992,
+        page_inventory_sha256=arguments.expected_page_inventory_sha256,
+        block_identity_inventory_sha256=(
+            arguments.expected_block_identity_inventory_sha256
+        ),
+        enrichment_identity_inventory_sha256=(
+            arguments.expected_enrichment_identity_inventory_sha256
+        ),
         enrichment_available_count=16_985,
         enrichment_unavailable_count=0,
         chunk_count=16_985,
@@ -462,6 +571,7 @@ def test__exact_golub_inventory_gate_accepts_only_all_pinned_counts() -> None:
         chunking_request_id=arguments.expected_chunking_request_id,
         chunk_inventory_id=arguments.expected_chunk_inventory_id,
         chunking_result_id=arguments.expected_chunking_result_id,
+        chunk_selection_id=arguments.expected_chunk_selection_id,
         chunk_manifest_sha256=(
             arguments.expected_document_chunk_manifest_sha256
         ),
@@ -470,8 +580,21 @@ def test__exact_golub_inventory_gate_accepts_only_all_pinned_counts() -> None:
     with pytest.raises(admission.AdmissionInventoryError):
         admission.validate_document_inventory(
             arguments=arguments,
+            source_page_count=780,
+            source_chunk_count=16_985,
+            source_chunk_inventory_id=(
+                arguments.expected_source_chunk_inventory_id
+            ),
             page_count=780,
             block_count=16_984,
+            document_text_utf8_bytes=1_504_992,
+            page_inventory_sha256=arguments.expected_page_inventory_sha256,
+            block_identity_inventory_sha256=(
+                arguments.expected_block_identity_inventory_sha256
+            ),
+            enrichment_identity_inventory_sha256=(
+                arguments.expected_enrichment_identity_inventory_sha256
+            ),
             enrichment_available_count=16_985,
             enrichment_unavailable_count=0,
             chunk_count=16_985,
@@ -479,6 +602,7 @@ def test__exact_golub_inventory_gate_accepts_only_all_pinned_counts() -> None:
             chunking_request_id=arguments.expected_chunking_request_id,
             chunk_inventory_id=arguments.expected_chunk_inventory_id,
             chunking_result_id=arguments.expected_chunking_result_id,
+            chunk_selection_id=arguments.expected_chunk_selection_id,
             chunk_manifest_sha256=(
                 arguments.expected_document_chunk_manifest_sha256
             ),
