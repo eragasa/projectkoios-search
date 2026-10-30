@@ -53,6 +53,7 @@ def _active_retriever() -> tuple[
     projector.activate(
         generation=generation,
         expected_active_generation_id=None,
+        expected_active_pointer_revision=None,
     )
     return (
         MongoPageProjectionLexicalRetriever(
@@ -150,6 +151,7 @@ def test__stage__counts_repeated_term_once_for_document_frequency() -> None:
     projector.activate(
         generation=generation,
         expected_active_generation_id=None,
+        expected_active_pointer_revision=None,
     )
     retriever = MongoPageProjectionLexicalRetriever(
         database=database,

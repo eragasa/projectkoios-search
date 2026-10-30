@@ -260,6 +260,7 @@ def test__activate__uses_single_pointer_compare_and_set() -> None:
         projector.activate(
             generation=first,
             expected_active_generation_id=None,
+            expected_active_pointer_revision=None,
         )
         == first
     )
@@ -276,6 +277,7 @@ def test__activate__uses_single_pointer_compare_and_set() -> None:
         projector.activate(
             generation=second,
             expected_active_generation_id="stale-generation",
+            expected_active_pointer_revision=1,
         )
     assert projector.active_generation() == first
 
@@ -283,10 +285,54 @@ def test__activate__uses_single_pointer_compare_and_set() -> None:
         projector.activate(
             generation=second,
             expected_active_generation_id=first.generation_id,
+            expected_active_pointer_revision=1,
         )
         == second
     )
     assert projector.active_generation() == second
+    snapshot = projector.active_snapshot()
+    assert snapshot.generation == second
+    assert snapshot.generation_id == second.generation_id
+    assert snapshot.pointer_revision == 2
+
+
+def test__activate__rejects_aba_revision_without_pointer_mutation() -> None:
+    """Bind the observed revision even when generation identity returns."""
+
+    database = _database("activation-aba")
+    projector = MongoPageProjectionLexicalProjector(
+        database=database,
+        storage_target_id="projectkoios.search.mongodb.development",
+    )
+    chunks = _chunks()
+    first = projector.stage(chunks=chunks)
+    projector.activate(
+        generation=first,
+        expected_active_generation_id=None,
+        expected_active_pointer_revision=None,
+    )
+    observed = projector.active_snapshot()
+    second = projector.stage(
+        chunks=(replace(chunks[0], text="Revision-bound change."), chunks[1])
+    )
+    generations = database[projector.GENERATIONS_COLLECTION]
+    generations.update_one(
+        {"_id": "active"},
+        {"$inc": {"revision": 2}},
+    )
+    pointer_before = generations.find_one({"_id": "active"})
+
+    with pytest.raises(
+        MongoPageProjectionLexicalError, match="compare-and-set"
+    ):
+        projector.activate(
+            generation=second,
+            expected_active_generation_id=observed.generation_id,
+            expected_active_pointer_revision=observed.pointer_revision,
+        )
+
+    assert generations.find_one({"_id": "active"}) == pointer_before
+    assert projector.active_generation() == first
 
 
 def test__stage__rejects_duplicate_or_nonstructural_chunks() -> None:
@@ -328,6 +374,7 @@ def test__activate__reverifies_staged_documents_fail_closed() -> None:
         projector.activate(
             generation=generation,
             expected_active_generation_id=None,
+            expected_active_pointer_revision=None,
         )
 
 
@@ -349,4 +396,5 @@ def test__activate__rejects_generation_metadata_drift() -> None:
         projector.activate(
             generation=generation,
             expected_active_generation_id=None,
+            expected_active_pointer_revision=None,
         )

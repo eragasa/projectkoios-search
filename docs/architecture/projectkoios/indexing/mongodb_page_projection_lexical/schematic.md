@@ -12,7 +12,8 @@ flowchart TB
     P --> Verify
     S --> Verify
     G --> Verify
-    Verify --> CAS["single-document active pointer CAS"]
+    Verify --> Snapshot["generation + pointer-revision snapshot"]
+    Snapshot --> CAS["revision-bound single-document active pointer CAS"]
     G --> Retriever["MongoPageProjectionLexicalRetriever"]
     P --> Retriever
     S --> Retriever
