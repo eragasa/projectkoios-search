@@ -13,9 +13,12 @@ import mongomock
 import pytest
 from projectkoios.indexing.mongodb_page_projection_lexical import (
     MongoPageProjectionLexicalProjector,
+    MongoPageProjectionLexicalRetriever,
 )
 from projectkoios.search.page_projection_lexical import (
     PageProjectionLexicalIdentity,
+    PageProjectionLexicalSearchRequest,
+    PageProjectionLexicalSearchResult,
 )
 from pymongo.database import Database
 
@@ -336,6 +339,113 @@ def test__run_admission__activates_then_replays_without_pointer_increment(
         database[projector.GENERATIONS_COLLECTION].find_one({"_id": "active"})
         == pointer_after_first
     )
+
+
+def test__admission_record__rejects_pointer_aba_during_retrieval(
+    monkeypatch: pytest.MonkeyPatch,
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    database = _database("retrieval-aba")
+    projector = MongoPageProjectionLexicalProjector(
+        database=database,
+        storage_target_id=admission.STORAGE_TARGET_ID,
+    )
+    document = _loaded_target()
+    before = projector.active_snapshot()
+    plan = admission.union_plan(
+        projector=projector,
+        snapshot=before,
+        document=document,
+    )
+    target_generation = projector.stage(chunks=plan.union_chunks)
+    alternate_chunk = replace(
+        document.chunks[0], text="Alternate lexical generation."
+    )
+    alternate_generation = projector.stage(chunks=(alternate_chunk,))
+    projector.activate(
+        generation=target_generation,
+        expected_active_generation_id=None,
+        expected_active_pointer_revision=None,
+    )
+    after = projector.active_snapshot()
+    arguments = replace(
+        _arguments(),
+        page_projection_result_id=(
+            document.chunks[0].page_projection_result_id
+        ),
+        smoke_query="figure",
+    )
+    original_search = MongoPageProjectionLexicalRetriever.search
+    calls = 0
+
+    def search_with_aba(
+        self: MongoPageProjectionLexicalRetriever,
+        *,
+        request: PageProjectionLexicalSearchRequest,
+    ) -> PageProjectionLexicalSearchResult:
+        nonlocal calls
+        result = original_search(self, request=request)
+        calls += 1
+        if calls == 2:
+            generations = database[projector.GENERATIONS_COLLECTION]
+            generations.update_one(
+                {
+                    "_id": "active",
+                    "generation_id": target_generation.generation_id,
+                    "revision": 1,
+                },
+                {
+                    "$set": {
+                        "generation_id": alternate_generation.generation_id,
+                        "corpus_id": alternate_generation.corpus_id,
+                        "index_id": alternate_generation.index_id,
+                    },
+                    "$inc": {"revision": 1},
+                },
+            )
+            generations.update_one(
+                {
+                    "_id": "active",
+                    "generation_id": alternate_generation.generation_id,
+                    "revision": 2,
+                },
+                {
+                    "$set": {
+                        "generation_id": target_generation.generation_id,
+                        "corpus_id": target_generation.corpus_id,
+                        "index_id": target_generation.index_id,
+                    },
+                    "$inc": {"revision": 1},
+                },
+            )
+        return result
+
+    monkeypatch.setattr(
+        MongoPageProjectionLexicalRetriever,
+        "search",
+        search_with_aba,
+    )
+
+    with pytest.raises(admission.AdmissionCASError):
+        admission.admission_record(
+            arguments=arguments,
+            database=database,
+            projector=projector,
+            before=before,
+            after=after,
+            document=document,
+            plan=plan,
+            replay_generation=target_generation,
+        )
+    captured = capfd.readouterr()
+
+    assert calls == 2
+    assert captured.out == ""
+    assert captured.err == ""
+    assert projector.active_snapshot().generation_id == (
+        target_generation.generation_id
+    )
+    assert projector.active_snapshot().pointer_revision == 3
 
 
 def test__exact_golub_inventory_gate_accepts_only_all_pinned_counts() -> None:

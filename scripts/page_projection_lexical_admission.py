@@ -1113,6 +1113,9 @@ def admission_record(
         for value in locators
     ):
         raise AdmissionRetrievalError
+    validated_after = projector.active_snapshot()
+    if validated_after != after:
+        raise AdmissionCASError
     if before.generation_id == plan.generation.generation_id:
         disposition = "replayed-identical"
         expected_revision = before.pointer_revision
@@ -1125,12 +1128,12 @@ def admission_record(
             else before.pointer_revision + 1
         )
         pointer_changed = True
-    if after.pointer_revision != expected_revision:
+    if validated_after.pointer_revision != expected_revision:
         raise AdmissionCASError
     record: dict[str, object] = {
-        "active_generation_id_after": after.generation_id,
+        "active_generation_id_after": validated_after.generation_id,
         "active_generation_id_before": before.generation_id,
-        "active_pointer_revision_after": after.pointer_revision,
+        "active_pointer_revision_after": validated_after.pointer_revision,
         "active_pointer_revision_before": before.pointer_revision,
         "active_state_before": ABSENT
         if before.generation is None
@@ -1157,7 +1160,7 @@ def admission_record(
         "projection_chunk_counts_before": projection_counts(plan.active_chunks),
         "publication_id": arguments.publication_id,
         "replay_generation_id": replay_generation.generation_id,
-        "replay_pointer_revision": after.pointer_revision,
+        "replay_pointer_revision": validated_after.pointer_revision,
         "retrieval_replay_result_id": replay_retrieval.result_id,
         "retrieval_result_id": retrieval.result_id,
         "schema_id": projector.SCHEMA_ID,
