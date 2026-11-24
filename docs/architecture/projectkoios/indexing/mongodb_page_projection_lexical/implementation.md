@@ -101,9 +101,12 @@ The repository owns two bounded development-only modules:
 `scripts.preflight_page_projection_lexical_admission` and
 `scripts.admit_page_projection_lexical_publication`. Both use Ingestion's exact
 pinned typed publication loader and Search's production chunker; neither decodes
-upstream publication JSON. The command first chunks the complete typed
-projection without filtering. It then selects one explicit inclusive physical
-page-index window. The invocation binds the complete source page/chunk counts
+upstream publication JSON. The exact payload byte length and owner-native
+maximum payload ceiling remain distinct typed-load request fields: the ceiling
+must be at least the payload length and no greater than 1,000,000,000 bytes, and
+the pinned loader request identity binds it exactly. The command first chunks
+the complete typed projection without filtering. It then selects one explicit
+inclusive physical page-index window. The invocation binds the complete source page/chunk counts
 and source chunk inventory as well as the selected page range, canonical page,
 block, and enrichment inventory digests, selected chunk inventory and manifest,
 UTF-8 text-byte count, style/enrichment counts, and a derived

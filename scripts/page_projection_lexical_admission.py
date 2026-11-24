@@ -521,6 +521,12 @@ def parse_arguments(
             "--expected-figure-caption-count",
         )
     )
+    payload_byte_length = _require_int(
+        raw["--payload-byte-length"], minimum=1, maximum=1_000_000_000
+    )
+    maximum_payload_bytes = _require_int(
+        raw["--maximum-payload-bytes"], minimum=1, maximum=1_000_000_000
+    )
     if (
         page_index_first > page_index_last
         or page_index_last >= source_page_count
@@ -528,16 +534,7 @@ def parse_arguments(
         or selected_chunk_count > source_chunk_count
         or available_count + unavailable_count != selected_chunk_count
         or style_count != selected_chunk_count
-        or _require_int(
-            raw["--maximum-payload-bytes"],
-            minimum=1,
-            maximum=1_000_000_000,
-        )
-        != _require_int(
-            raw["--payload-byte-length"],
-            minimum=1,
-            maximum=1_000_000_000,
-        )
+        or maximum_payload_bytes < payload_byte_length
     ):
         raise AdmissionInvocationError
     return AdmissionArguments(
@@ -571,9 +568,7 @@ def parse_arguments(
             prefix="page-projection-publication-payload:sha256:",
         ),
         payload_sha256=_require_sha256(raw["--payload-sha256"]),
-        payload_byte_length=_require_int(
-            raw["--payload-byte-length"], minimum=1, maximum=1_000_000_000
-        ),
+        payload_byte_length=payload_byte_length,
         page_projection_result_id=_require_identity(
             raw["--page-projection-result-id"],
             prefix="page-projection-result:sha256:",
@@ -582,9 +577,7 @@ def parse_arguments(
             raw["--enrichment-result-id"],
             prefix="page-projection-evidence-enrichment-result:sha256:",
         ),
-        maximum_payload_bytes=_require_int(
-            raw["--maximum-payload-bytes"], minimum=1, maximum=1_000_000_000
-        ),
+        maximum_payload_bytes=maximum_payload_bytes,
         expected_load_request_id=_require_identity(
             raw["--expected-load-request-id"],
             prefix="page-projection-publication-load-request:sha256:",

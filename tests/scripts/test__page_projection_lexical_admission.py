@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
+from types import ModuleType, SimpleNamespace
 from typing import cast
 
 import mongomock
@@ -99,6 +101,83 @@ def _arguments() -> admission.AdmissionArguments:
     )
 
 
+def _common_argv(arguments: admission.AdmissionArguments) -> tuple[str, ...]:
+    values: dict[str, object] = {
+        "--database-name": admission.DATABASE_NAME,
+        "--storage-target-id": admission.STORAGE_TARGET_ID,
+        "--capability-id": admission.CAPABILITY_ID,
+        "--connection-uri-fd": str(admission.CONNECTION_URI_DESCRIPTOR),
+        "--publication-root": arguments.publication_root,
+        "--source-sha256": arguments.source_sha256,
+        "--source-byte-length": arguments.source_byte_length,
+        "--source-media-type": arguments.source_media_type,
+        "--source-artifact-id": arguments.source_artifact_id,
+        "--pipeline-configuration-id": arguments.pipeline_configuration_id,
+        "--publication-id": arguments.publication_id,
+        "--receipt-id": arguments.receipt_id,
+        "--receipt-sha256": arguments.receipt_sha256,
+        "--receipt-byte-length": arguments.receipt_byte_length,
+        "--payload-id": arguments.payload_id,
+        "--payload-sha256": arguments.payload_sha256,
+        "--payload-byte-length": arguments.payload_byte_length,
+        "--page-projection-result-id": arguments.page_projection_result_id,
+        "--enrichment-result-id": arguments.enrichment_result_id,
+        "--maximum-payload-bytes": arguments.maximum_payload_bytes,
+        "--expected-load-request-id": arguments.expected_load_request_id,
+        "--expected-load-result-id": arguments.expected_load_result_id,
+        "--expected-source-page-count": arguments.expected_source_page_count,
+        "--expected-source-chunk-count": arguments.expected_source_chunk_count,
+        "--physical-page-index-first": arguments.physical_page_index_first,
+        "--physical-page-index-last": arguments.physical_page_index_last,
+        "--expected-page-inventory-sha256": (
+            arguments.expected_page_inventory_sha256
+        ),
+        "--expected-block-identity-inventory-sha256": (
+            arguments.expected_block_identity_inventory_sha256
+        ),
+        "--expected-enrichment-identity-inventory-sha256": (
+            arguments.expected_enrichment_identity_inventory_sha256
+        ),
+        "--expected-page-count": arguments.expected_page_count,
+        "--expected-chunk-count": arguments.expected_chunk_count,
+        "--expected-document-text-utf8-bytes": (
+            arguments.expected_document_text_utf8_bytes
+        ),
+        "--expected-enrichment-available-count": (
+            arguments.expected_enrichment_available_count
+        ),
+        "--expected-enrichment-unavailable-count": (
+            arguments.expected_enrichment_unavailable_count
+        ),
+        "--expected-paragraph-count": arguments.expected_paragraph_count,
+        "--expected-heading-count": arguments.expected_heading_count,
+        "--expected-figure-caption-count": (
+            arguments.expected_figure_caption_count
+        ),
+        "--expected-chunking-request-id": (
+            arguments.expected_chunking_request_id
+        ),
+        "--expected-source-chunk-inventory-id": (
+            arguments.expected_source_chunk_inventory_id
+        ),
+        "--expected-chunk-inventory-id": (
+            arguments.expected_chunk_inventory_id
+        ),
+        "--expected-chunking-result-id": arguments.expected_chunking_result_id,
+        "--expected-chunk-selection-id": arguments.expected_chunk_selection_id,
+        "--expected-document-chunk-manifest-sha256": (
+            arguments.expected_document_chunk_manifest_sha256
+        ),
+        "--smoke-query": arguments.smoke_query,
+        "--smoke-limit": arguments.smoke_limit,
+    }
+    return tuple(
+        item
+        for name in admission._COMMON_ARGUMENT_NAMES
+        for item in (name, str(values[name]))
+    )
+
+
 def _loaded_target() -> admission.LoadedDocument:
     chunks = tuple(derive_chunking_result().chunks)
     target = replace(
@@ -158,6 +237,176 @@ def _connection_fd(value: bytes) -> Iterator[None]:
         if saved is not None:
             os.dup2(saved, 3)
             os.close(saved)
+
+
+@pytest.mark.parametrize(
+    "maximum_payload_bytes",
+    (116_343_576, 1_000_000_000),
+)
+def test__parse_arguments__binds_owner_payload_ceiling(
+    maximum_payload_bytes: int,
+) -> None:
+    arguments = replace(
+        _arguments(), maximum_payload_bytes=maximum_payload_bytes
+    )
+
+    parsed = admission.parse_arguments(
+        argv=_common_argv(arguments), admission=False
+    )
+
+    assert parsed == arguments
+    assert parsed.payload_byte_length == 116_343_576
+    assert parsed.maximum_payload_bytes == maximum_payload_bytes
+
+
+@pytest.mark.parametrize(
+    "maximum_payload_bytes",
+    (116_343_575, 1_000_000_001),
+)
+def test__parse_arguments__rejects_unsafe_payload_ceiling(
+    maximum_payload_bytes: int,
+) -> None:
+    arguments = replace(
+        _arguments(), maximum_payload_bytes=maximum_payload_bytes
+    )
+
+    with pytest.raises(admission.AdmissionInvocationError):
+        admission.parse_arguments(argv=_common_argv(arguments), admission=False)
+
+
+def test__parse_arguments__rejects_unknown_or_omitted_options() -> None:
+    valid = _common_argv(_arguments())
+
+    with pytest.raises(admission.AdmissionInvocationError):
+        admission.parse_arguments(argv=valid[:-2], admission=False)
+    with pytest.raises(admission.AdmissionInvocationError):
+        admission.parse_arguments(
+            argv=(*valid, "--unknown", "value"), admission=False
+        )
+
+
+def test__load_document__binds_distinct_ceiling_to_owner_request_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+    request_id = "page-projection-publication-load-request:sha256:" + "1" * 64
+    arguments = replace(
+        _arguments(),
+        maximum_payload_bytes=1_000_000_000,
+        expected_load_request_id=request_id,
+    )
+
+    class FakeManagedArtifactReference:
+        def __init__(self, **_kwargs: object) -> None:
+            self.artifact_id = arguments.source_artifact_id
+
+    class FakePageProjectionPublicationLoadRequest:
+        def __init__(self, **kwargs: object) -> None:
+            captured.update(kwargs)
+            self.request_id = (
+                request_id
+                if kwargs["maximum_payload_bytes"] == 1_000_000_000
+                else "page-projection-publication-load-request:sha256:"
+                + "0" * 64
+            )
+
+    class FakePageProjectionResult:
+        def __init__(self) -> None:
+            self.result_id = arguments.page_projection_result_id
+
+    class FakeLoadRuntime:
+        def __init__(self, *, publication_root: Path) -> None:
+            captured["publication_root"] = publication_root
+
+        def create_actionizer(self) -> FakeLoadRuntime:
+            return self
+
+        def action(
+            self, *, request: FakePageProjectionPublicationLoadRequest
+        ) -> SimpleNamespace:
+            captured["request"] = request
+            return SimpleNamespace(
+                result_id=arguments.expected_load_result_id,
+                projection=FakePageProjectionResult(),
+                enrichment=SimpleNamespace(
+                    result_id=arguments.enrichment_result_id,
+                    entries=(),
+                ),
+            )
+
+    class StopAfterOwnerLoad(RuntimeError):
+        pass
+
+    class FakeChunker:
+        def action(self, **_kwargs: object) -> None:
+            raise StopAfterOwnerLoad
+
+    modules = {
+        "projectkoios.ingestion.artifact.managed.media.type": {
+            "ManagedArtifactMediaType": str,
+        },
+        "projectkoios.ingestion.artifact.managed.reference": {
+            "ManagedArtifactReference": FakeManagedArtifactReference,
+        },
+        (
+            "projectkoios.ingestion.integrations.disk.page.projection."
+            "publication.load.runtime"
+        ): {"DiskPageProjectionPublicationLoadRuntime": FakeLoadRuntime},
+        "projectkoios.ingestion.page.projection.enrichment.record": {
+            "PageProjectionEvidenceEnrichment": type(
+                "PageProjectionEvidenceEnrichment", (), {}
+            ),
+        },
+        "projectkoios.ingestion.page.projection.publication.load.request": {
+            "PageProjectionPublicationLoadRequest": (
+                FakePageProjectionPublicationLoadRequest
+            ),
+        },
+        "projectkoios.ingestion.page.projection.result": {
+            "PageProjectionResult": FakePageProjectionResult,
+        },
+        "projectkoios.ingestion.sha256.hash": {"SHA256Hash": str},
+    }
+    package_names = {
+        "projectkoios.ingestion",
+        "projectkoios.ingestion.artifact",
+        "projectkoios.ingestion.artifact.managed",
+        "projectkoios.ingestion.artifact.managed.media",
+        "projectkoios.ingestion.integrations",
+        "projectkoios.ingestion.integrations.disk",
+        "projectkoios.ingestion.integrations.disk.page",
+        "projectkoios.ingestion.integrations.disk.page.projection",
+        "projectkoios.ingestion.integrations.disk.page.projection.publication",
+        "projectkoios.ingestion.integrations.disk.page.projection.publication.load",
+        "projectkoios.ingestion.page",
+        "projectkoios.ingestion.page.projection",
+        "projectkoios.ingestion.page.projection.enrichment",
+        "projectkoios.ingestion.page.projection.publication",
+        "projectkoios.ingestion.page.projection.publication.load",
+        "projectkoios.ingestion.sha256",
+    }
+    for name in package_names:
+        monkeypatch.setitem(sys.modules, name, ModuleType(name))
+    for name, attributes in modules.items():
+        module = ModuleType(name)
+        for attribute, value in attributes.items():
+            setattr(module, attribute, value)
+        monkeypatch.setitem(sys.modules, name, module)
+    monkeypatch.setattr(admission, "PageProjectionChunker", FakeChunker)
+    monkeypatch.setattr(
+        admission,
+        "PageProjectionChunkingRequest",
+        lambda *, projection_result: projection_result,
+    )
+
+    with pytest.raises(admission.AdmissionInventoryError) as raised:
+        admission.load_document(arguments=arguments)
+
+    assert isinstance(raised.value.__cause__, StopAfterOwnerLoad)
+    assert captured["maximum_payload_bytes"] == 1_000_000_000
+    assert captured["expected_payload_byte_length"] == 116_343_576
+    assert captured["publication_root"] == arguments.publication_root
+    assert captured["request"].request_id == request_id
 
 
 def test__union_plan__preserves_every_active_chunk_and_adds_target() -> None:
