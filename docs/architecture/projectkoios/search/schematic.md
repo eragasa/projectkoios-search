@@ -12,6 +12,7 @@ flowchart TB
     Facade["projectkoios.search facade"] --> Evidence["evidence_retrieval"]
     Facade --> Literature["literature"]
     Facade --> Models["models"]
+    Facade --> PageSearch["page_search"]
     Facade --> Protocols["protocols"]
     Facade --> Service["service"]
     Literature --> Models
@@ -29,6 +30,8 @@ flowchart TB
     Lexical -. "not facade-exported" .-> Facade
     Authority -. "not facade-exported" .-> Facade
     MongoLexical["indexing.mongodb_page_projection_lexical"] --> Lexical
+    PageSearch --> SQLite[(SQLite FTS5)]
+    API["projectkoios-api"] --> PageSearch
 ```
 
 Solid arrows represent imports, derivation, or facade exports. Dotted

@@ -23,3 +23,28 @@ authority boundary documented under
 [`authority_bound_evidence`](docs/architecture/projectkoios/search/authority_bound_evidence/index.md).
 These implementations do not accept the proposed contracts indexed in
 [`docs/contracts/README.md`](docs/contracts/README.md).
+
+## Solid-state semiconductor page search
+
+The repository-owned [`page_search` operation](docs/architecture/projectkoios/search/page_search/index.md)
+builds an atomic SQLite FTS5 index from exact Search-owned
+`PageProjectionChunkingResult` objects and exposes a bounded read-only BM25 API. The
+build plan carries catalog-safe document metadata and may retain explicit
+pending roster entries; it does not decode publication JSON or read source
+paths.
+
+```bash
+koios-page-search-index status \
+  --database /explicit/path/to/search.sqlite3
+
+koios-page-search-index query \
+  --database /explicit/path/to/search.sqlite3 \
+  --query "Fermi surface" \
+  --limit 10
+```
+
+Only projected paragraphs, headings, and admitted figure captions enter FTS
+text. Equation proposals and media locators remain outside the index.
+
+API consumers import `PageSearchIndex` from `projectkoios.search`; they do not
+open SQLite or depend on its schema.
