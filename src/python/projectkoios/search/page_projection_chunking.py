@@ -32,6 +32,7 @@ from projectkoios.ingestion.page.projection.result import PageProjectionResult
 __all__: tuple[str, ...] = (
     "PageProjectionChunk",
     "PageProjectionChunkInventory",
+    "PageProjectionChunkPage",
     "PageProjectionChunkStyle",
     "PageProjectionChunker",
     "PageProjectionChunkingRequest",
@@ -204,6 +205,33 @@ class _PageProjectionChunkingIdentity:
             sort_keys=True,
         ).encode("utf-8", errors="strict")
         return f"{prefix}:sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class PageProjectionChunkPage(DataObjectModel):
+    """Expose one complete projected page location to Search consumers."""
+
+    physical_page_index: int
+    printed_page_label: str | None
+
+    def __post_init__(self) -> None:
+        _PageProjectionChunkingValidation.require_nonnegative_int(
+            value=self.physical_page_index,
+            label="physical page index",
+        )
+        if self.printed_page_label is not None:
+            _PageProjectionChunkingValidation.require_text(
+                value=self.printed_page_label,
+                label="printed page label",
+                maximum_bytes=(
+                    _PageProjectionChunkingValidation.MAXIMUM_IDENTITY_BYTES
+                ),
+            )
+
+    @property
+    def physical_page_number(self) -> int:
+        """Return the one-based physical citation number."""
+        return self.physical_page_index + 1
 
 
 class PageProjectionChunkStyle(StrEnum):
@@ -824,6 +852,20 @@ class PageProjectionChunkingResult(DataObjectActionResult):
     chunker_implementation_id: str
     chunker_implementation_version: str
     result_id: str = field(init=False)
+
+    @property
+    def projected_pages(self) -> tuple[PageProjectionChunkPage, ...]:
+        """Return every source page, including pages without projected text."""
+        PageProjectionChunkingRequest.require_fresh_request(
+            request=self.request
+        )
+        return tuple(
+            PageProjectionChunkPage(
+                physical_page_index=page.physical_page_index,
+                printed_page_label=page.printed_page_label,
+            )
+            for page in self.request.projection_result.pages
+        )
 
     def __post_init__(self) -> None:
         """Validate complete derivation and compute immutable result identity.

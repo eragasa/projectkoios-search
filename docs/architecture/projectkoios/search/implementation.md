@@ -19,6 +19,7 @@ classDiagram
     class AuthorityBoundEvidenceModule["authority_bound_evidence"]
     class LiteratureModule["literature"]
     class ModelsModule["models"]
+    class PageSearchModule["page_search"]
     class ProtocolsModule["protocols"]
     class ServiceModule["service"]
 
@@ -30,6 +31,7 @@ classDiagram
     SearchFacade --> EvidenceRetrievalModule : re-export
     SearchFacade --> LiteratureModule : re-export
     SearchFacade --> ModelsModule : re-export
+    SearchFacade --> PageSearchModule : re-export
     SearchFacade --> ProtocolsModule : re-export
     SearchFacade --> ServiceModule : re-export
     LiteratureModule ..> ModelsModule : RetrievalPurpose
@@ -41,12 +43,12 @@ classDiagram
 ```
 
 Facade exports preserve each defining module's class identity; the initializer
-defines no classes of its own. Ingestion dependencies are limited to the exact
-`PageProjectionResult` import inside `page_projection_chunking` and public
-enrichment modules inside `authority_bound_evidence`; indexing and unrelated
-retrieval modules import neither leaf. The package owns no API transport,
-persistence, workflow, rights decision,
-publication, or target-document behavior. `page_projection_lexical` owns only
-backend-neutral immutable generation values; Mongo persistence is owned by the
-separate indexing module. Public implementation classes are documented at exact
-defining-module paths.
+defines no classes of its own. Ingestion dependencies are limited to exact
+public typed leaves used by `page_projection_chunking` and
+`authority_bound_evidence`; `page_search`, indexing, and unrelated retrieval
+modules import neither leaf. `page_search` owns its derived SQLite FTS persistence and exposes
+safe status and search operations to API consumers. The package owns no API
+transport, workflow, rights decision, publication, or target-document behavior.
+`page_projection_lexical` owns only backend-neutral immutable generation values;
+Mongo persistence is owned by the separate indexing module. Public
+implementation classes are documented at exact defining-module paths.

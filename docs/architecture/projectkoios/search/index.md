@@ -15,6 +15,7 @@ at their defining modules without aliases or conversion paths.
 | [`authority_bound_evidence`](authority_bound_evidence/index.md) | Exact A+B+C admission and accepted-authority lexical retrieval | Production manuscript-authoring boundary |
 | [`literature`](literature/index.md) | Literature-review records, bundling, protocol, and SQLite FTS adapter | Independent prototype family |
 | [`models`](models/index.md) | Chunk results, retrieval purposes, roles, admissions, requests, and results | Independent prototype records; not authoring source evidence |
+| [`page_search`](page_search/index.md) | Validated physical-page projection and persistent FTS5/BM25 owner operation | Independent solid-state semiconductor slice |
 | [`protocols`](protocols/index.md) | Unscoped and role-scoped index interfaces | Consumes `models` |
 | [`service`](service/index.md) | Pass-through search services | Delegates through `protocols` |
 
@@ -34,5 +35,6 @@ indexing and retrieval modules therefore does not load Ingestion or References.
 - [`authority_bound_evidence`](authority_bound_evidence/index.md) — production accepted-authority admission and retrieval.
 - [`literature`](literature/index.md) — reference-only literature retrieval prototype.
 - [`models`](models/index.md) — shared prototype records and admission policy.
+- [`page_search`](page_search/index.md) — persistent physical-page FTS5/BM25 operation.
 - [`protocols`](protocols/index.md) — structural index boundaries.
 - [`service`](service/index.md) — pass-through service boundaries.

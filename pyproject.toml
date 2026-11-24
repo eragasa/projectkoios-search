@@ -19,6 +19,9 @@ dependencies = [
 projectkoios-ingestion = { git = "https://github.com/eragasa/projectkoios-ingestion.git", rev = "0a534b54411708dc778a173591b8659e1a2aa107" }
 projectkoios-references = { git = "https://github.com/eragasa/projectkoios-references.git", rev = "1a7a0066b0116661c8bb688d494865d6e8797e0f" }
 
+[project.scripts]
+koios-page-search-index = "projectkoios.search.page_search_cli:main"
+
 [build-system]
 requires = ["setuptools>=61.0.0"]
 build-backend = "setuptools.build_meta"
