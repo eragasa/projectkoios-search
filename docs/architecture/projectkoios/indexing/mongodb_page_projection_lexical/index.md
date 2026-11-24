@@ -13,6 +13,7 @@ would be exceeded.
 
 ## Public classes
 
+- [`MongoPageProjectionLexicalActiveSnapshot`](MongoPageProjectionLexicalActiveSnapshot/index.md)
 - [`MongoPageProjectionLexicalError`](MongoPageProjectionLexicalError/index.md)
 - [`MongoPageProjectionLexicalProjector`](MongoPageProjectionLexicalProjector/index.md)
 - [`MongoPageProjectionLexicalRetriever`](MongoPageProjectionLexicalRetriever/index.md)

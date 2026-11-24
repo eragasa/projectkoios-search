@@ -32,6 +32,8 @@ sys.modules[_SPEC.name] = verification
 _SPEC.loader.exec_module(verification)
 assert isinstance(verification, ModuleType)
 
+MongoDocument = dict[str, object]
+
 
 def _descriptor(*, value: bytes) -> int:
     """Return a readable anonymous pipe containing one complete value."""
@@ -88,15 +90,15 @@ def _arguments() -> tuple[str, ...]:
 
 def _install_client(
     monkeypatch: pytest.MonkeyPatch,
-) -> mongomock.MongoClient:
+) -> mongomock.MongoClient[MongoDocument]:
     """Install one reusable in-memory client constructor for command tests."""
 
-    client = mongomock.MongoClient()
+    client: mongomock.MongoClient[MongoDocument] = mongomock.MongoClient()
 
     def client_factory(
         connection_uri: str,
         **options: object,
-    ) -> mongomock.MongoClient:
+    ) -> mongomock.MongoClient[MongoDocument]:
         assert connection_uri == "secret-connection-material"
         assert options == {
             "appname": "projectkoios-search-lexical-verification",

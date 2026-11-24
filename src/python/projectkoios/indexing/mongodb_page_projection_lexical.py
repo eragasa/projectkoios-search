@@ -19,6 +19,7 @@ import json
 import math
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from itertools import islice
 from typing import ClassVar, cast
 
@@ -39,6 +40,7 @@ from pymongo.read_concern import ReadConcern
 from pymongo.write_concern import WriteConcern
 
 __all__: tuple[str, ...] = (
+    "MongoPageProjectionLexicalActiveSnapshot",
     "MongoPageProjectionLexicalError",
     "MongoPageProjectionLexicalProjector",
     "MongoPageProjectionLexicalRetriever",
@@ -143,6 +145,46 @@ def _without_storage_fields(document: Mapping[str, object]) -> MongoDocument:
 
 class MongoPageProjectionLexicalError(RuntimeError):
     """Report fail-closed lexical persistence or retrieval failure."""
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class MongoPageProjectionLexicalActiveSnapshot:
+    """Bind one active generation observation to its pointer revision.
+
+    An absent pointer is represented only by both fields being ``None``. A
+    present generation always carries the exact positive revision read from the
+    same singleton pointer document. Callers can therefore retain and bind the
+    complete observation in a later activation compare-and-set.
+    """
+
+    generation: PageProjectionLexicalGeneration | None
+    pointer_revision: int | None
+
+    def __post_init__(self) -> None:
+        """Require one coherent explicit-present or explicit-absent state."""
+
+        if self.generation is None:
+            if self.pointer_revision is not None:
+                raise ValueError(
+                    "absent active generation cannot carry a pointer revision"
+                )
+            return
+        if type(self.generation) is not PageProjectionLexicalGeneration:
+            raise TypeError(
+                "generation must be PageProjectionLexicalGeneration or None"
+            )
+        if type(self.pointer_revision) is not int or self.pointer_revision < 1:
+            raise ValueError(
+                "present active generation requires a positive revision"
+            )
+
+    @property
+    def generation_id(self) -> str | None:
+        """Return the observed generation identity or explicit absence."""
+
+        if self.generation is None:
+            return None
+        return self.generation.generation_id
 
 
 class _MongoPageProjectionLexicalBase:
@@ -336,18 +378,22 @@ class _MongoPageProjectionLexicalBase:
             )
         return self._generation_from_metadata(metadata)
 
-    def active_generation(self) -> PageProjectionLexicalGeneration | None:
-        """Return the exact active ready generation, if any.
+    def active_snapshot(self) -> MongoPageProjectionLexicalActiveSnapshot:
+        """Return one generation-and-revision observation of the active pointer.
 
         Returns
         -------
-        PageProjectionLexicalGeneration | None
-            Active generation or ``None`` before first activation.
+        MongoPageProjectionLexicalActiveSnapshot
+            Explicit absent state, or the validated ready generation and exact
+            positive revision read from the same singleton pointer document.
         """
 
         pointer = self._generations.find_one({"_id": "active"})
         if pointer is None:
-            return None
+            return MongoPageProjectionLexicalActiveSnapshot(
+                generation=None,
+                pointer_revision=None,
+            )
         generation_id = pointer.get("generation_id")
         if type(generation_id) is not str:
             raise MongoPageProjectionLexicalError(
@@ -385,7 +431,15 @@ class _MongoPageProjectionLexicalBase:
             raise MongoPageProjectionLexicalError(
                 "active generation pointer revision is malformed"
             )
-        return generation
+        return MongoPageProjectionLexicalActiveSnapshot(
+            generation=generation,
+            pointer_revision=revision,
+        )
+
+    def active_generation(self) -> PageProjectionLexicalGeneration | None:
+        """Return the exact active ready generation, if any."""
+
+        return self.active_snapshot().generation
 
 
 class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
@@ -555,16 +609,20 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
         *,
         generation: PageProjectionLexicalGeneration,
         expected_active_generation_id: str | None,
+        expected_active_pointer_revision: int | None,
     ) -> PageProjectionLexicalGeneration:
-        """Atomically switch the active generation through compare-and-set.
+        """Atomically switch the active generation through revision-bound CAS.
 
         Parameters
         ----------
         generation
             Exact previously staged generation to activate.
         expected_active_generation_id
-            Current active identity expected by the caller, or ``None`` for
-            first activation.
+            Current active identity observed by the caller, or explicit
+            ``None`` when the caller observed no active pointer.
+        expected_active_pointer_revision
+            Exact positive pointer revision observed with the expected active
+            generation, or explicit ``None`` for the same absent observation.
 
         Returns
         -------
@@ -576,11 +634,23 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
             raise TypeError(
                 "generation must be PageProjectionLexicalGeneration"
             )
-        if expected_active_generation_id is not None:
+        if expected_active_generation_id is None:
+            if expected_active_pointer_revision is not None:
+                raise ValueError(
+                    "absent expected generation requires absent revision"
+                )
+        else:
             _require_identity(
                 value=expected_active_generation_id,
                 label="expected active generation ID",
             )
+            if (
+                type(expected_active_pointer_revision) is not int
+                or expected_active_pointer_revision < 1
+            ):
+                raise ValueError(
+                    "present expected generation requires positive revision"
+                )
         persisted = self._ready_generation(
             generation_id=generation.generation_id
         )
@@ -591,8 +661,14 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
         # Full content verification immediately before the pointer CAS prevents
         # activation of modified or incomplete staging documents.
         self._verify_persisted_generation(generation=generation)
-        current = self.active_generation()
-        pointer = self._generations.find_one({"_id": "active"})
+        current = self.active_snapshot()
+        if (
+            current.generation_id != expected_active_generation_id
+            or current.pointer_revision != expected_active_pointer_revision
+        ):
+            raise MongoPageProjectionLexicalError(
+                "active generation compare-and-set failed"
+            )
         replacement = {
             "document_type": "active-generation-pointer",
             "generation_id": generation.generation_id,
@@ -602,10 +678,6 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
             "storage_target_id": self._storage_target_id,
         }
         if expected_active_generation_id is None:
-            if current is not None or pointer is not None:
-                raise MongoPageProjectionLexicalError(
-                    "active generation compare-and-set failed"
-                )
             try:
                 self._generations.insert_one(
                     {"_id": "active", "revision": 1, **replacement}
@@ -615,25 +687,11 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
                     "active generation compare-and-set failed"
                 ) from error
             return generation
-        if (
-            current is None
-            or current.generation_id != expected_active_generation_id
-            or pointer is None
-            or pointer.get("generation_id") != expected_active_generation_id
-        ):
-            raise MongoPageProjectionLexicalError(
-                "active generation compare-and-set failed"
-            )
-        revision = pointer.get("revision")
-        if type(revision) is not int or revision < 1:
-            raise MongoPageProjectionLexicalError(
-                "active generation pointer revision is malformed"
-            )
         result = self._generations.update_one(
             {
                 "_id": "active",
                 "generation_id": expected_active_generation_id,
-                "revision": revision,
+                "revision": expected_active_pointer_revision,
             },
             {"$set": replacement, "$inc": {"revision": 1}},
         )
@@ -648,8 +706,9 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
         *,
         chunks: Iterable[PageProjectionLexicalChunk],
         expected_active_generation_id: str | None,
+        expected_active_pointer_revision: int | None,
     ) -> PageProjectionLexicalGeneration:
-        """Stage, verify, and activate one clean deterministic rebuild.
+        """Stage, verify, and revision-CAS one deterministic rebuild.
 
         Parameters
         ----------
@@ -657,6 +716,8 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
             Complete exact Search chunk corpus.
         expected_active_generation_id
             Expected current active generation for the pointer CAS.
+        expected_active_pointer_revision
+            Pointer revision observed with the expected active generation.
 
         Returns
         -------
@@ -668,6 +729,7 @@ class MongoPageProjectionLexicalProjector(_MongoPageProjectionLexicalBase):
         return self.activate(
             generation=generation,
             expected_active_generation_id=expected_active_generation_id,
+            expected_active_pointer_revision=(expected_active_pointer_revision),
         )
 
     def _derive_documents(

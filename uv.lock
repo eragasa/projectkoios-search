@@ -276,7 +276,7 @@ source = { git = "https://github.com/eragasa/projectkoios.git?rev=233f36900b9b44
 [[package]]
 name = "projectkoios-ingestion"
 version = "0.0.0"
-source = { git = "https://github.com/eragasa/projectkoios-ingestion.git?rev=82b09440708375abf34f8e3a8597a719dcd88cb7#82b09440708375abf34f8e3a8597a719dcd88cb7" }
+source = { git = "https://github.com/eragasa/projectkoios-ingestion.git?rev=0a534b54411708dc778a173591b8659e1a2aa107#0a534b54411708dc778a173591b8659e1a2aa107" }
 dependencies = [
     { name = "projectkoios" },
 ]
@@ -314,7 +314,7 @@ requires-dist = [
     { name = "mongomock", marker = "extra == 'dev'", specifier = ">=4.3,<5" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13" },
     { name = "projectkoios", specifier = "==0.0.0" },
-    { name = "projectkoios-ingestion", git = "https://github.com/eragasa/projectkoios-ingestion.git?rev=82b09440708375abf34f8e3a8597a719dcd88cb7" },
+    { name = "projectkoios-ingestion", git = "https://github.com/eragasa/projectkoios-ingestion.git?rev=0a534b54411708dc778a173591b8659e1a2aa107" },
     { name = "projectkoios-references", git = "https://github.com/eragasa/projectkoios-references.git?rev=1a7a0066b0116661c8bb688d494865d6e8797e0f" },
     { name = "pymongo", specifier = ">=4.10,<4.11" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },

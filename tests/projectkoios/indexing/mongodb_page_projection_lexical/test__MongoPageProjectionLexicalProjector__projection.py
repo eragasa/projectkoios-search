@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from typing import cast
 
@@ -12,6 +13,7 @@ from projectkoios.indexing.mongodb_page_projection_lexical import (
     MongoPageProjectionLexicalError,
     MongoPageProjectionLexicalProjector,
 )
+from projectkoios.search.page_projection_chunking import PageProjectionChunk
 from projectkoios.search.page_projection_lexical import (
     PageProjectionLexicalChunk,
 )
@@ -39,16 +41,16 @@ def _database(name: str) -> Database[MongoDocument]:
         Injected database capability with no network or credentials.
     """
 
-    client = mongomock.MongoClient()
-    return cast(Database[MongoDocument], client[name])
+    client: mongomock.MongoClient[MongoDocument] = mongomock.MongoClient()
+    return client[name]
 
 
-def _chunks() -> tuple[PageProjectionLexicalChunk, ...]:
+def _chunks() -> tuple[PageProjectionChunk, ...]:
     """Return exact Search ``PageProjectionChunk`` outputs structurally.
 
     Returns
     -------
-    tuple[PageProjectionLexicalChunk, ...]
+    tuple[PageProjectionChunk, ...]
         Paragraph and figure-caption chunks from the frozen producer fixture.
     """
 
@@ -56,7 +58,7 @@ def _chunks() -> tuple[PageProjectionLexicalChunk, ...]:
     assert all(
         isinstance(value, PageProjectionLexicalChunk) for value in values
     )
-    return cast(tuple[PageProjectionLexicalChunk, ...], values)
+    return values
 
 
 def _generation_documents(
@@ -93,7 +95,9 @@ def test__ensure_indexes__uses_strict_pymongo_list_contract(
     """Pass lists and both exact unique definitions to the driver boundary."""
 
     observed: list[tuple[str, bool, tuple[tuple[str, object], ...]]] = []
-    original = MongoMockCollection.create_indexes
+    original = cast(
+        Callable[..., list[str]], MongoMockCollection.create_indexes
+    )
 
     def strict_create_indexes(
         self: MongoMockCollection,
@@ -144,7 +148,7 @@ def test__stage__uses_strict_pymongo_bulk_write_list_contract(
     """Pass exact ordered UpdateOne lists to every bulk-write boundary."""
 
     observed: list[tuple[UpdateOne, ...]] = []
-    original = MongoMockCollection.bulk_write
+    original = cast(Callable[..., object], MongoMockCollection.bulk_write)
 
     def strict_bulk_write(
         self: MongoMockCollection,
@@ -259,6 +263,7 @@ def test__activate__uses_single_pointer_compare_and_set() -> None:
         projector.activate(
             generation=first,
             expected_active_generation_id=None,
+            expected_active_pointer_revision=None,
         )
         == first
     )
@@ -275,6 +280,7 @@ def test__activate__uses_single_pointer_compare_and_set() -> None:
         projector.activate(
             generation=second,
             expected_active_generation_id="stale-generation",
+            expected_active_pointer_revision=1,
         )
     assert projector.active_generation() == first
 
@@ -282,10 +288,54 @@ def test__activate__uses_single_pointer_compare_and_set() -> None:
         projector.activate(
             generation=second,
             expected_active_generation_id=first.generation_id,
+            expected_active_pointer_revision=1,
         )
         == second
     )
     assert projector.active_generation() == second
+    snapshot = projector.active_snapshot()
+    assert snapshot.generation == second
+    assert snapshot.generation_id == second.generation_id
+    assert snapshot.pointer_revision == 2
+
+
+def test__activate__rejects_aba_revision_without_pointer_mutation() -> None:
+    """Bind the observed revision even when generation identity returns."""
+
+    database = _database("activation-aba")
+    projector = MongoPageProjectionLexicalProjector(
+        database=database,
+        storage_target_id="projectkoios.search.mongodb.development",
+    )
+    chunks = _chunks()
+    first = projector.stage(chunks=chunks)
+    projector.activate(
+        generation=first,
+        expected_active_generation_id=None,
+        expected_active_pointer_revision=None,
+    )
+    observed = projector.active_snapshot()
+    second = projector.stage(
+        chunks=(replace(chunks[0], text="Revision-bound change."), chunks[1])
+    )
+    generations = database[projector.GENERATIONS_COLLECTION]
+    generations.update_one(
+        {"_id": "active"},
+        {"$inc": {"revision": 2}},
+    )
+    pointer_before = generations.find_one({"_id": "active"})
+
+    with pytest.raises(
+        MongoPageProjectionLexicalError, match="compare-and-set"
+    ):
+        projector.activate(
+            generation=second,
+            expected_active_generation_id=observed.generation_id,
+            expected_active_pointer_revision=observed.pointer_revision,
+        )
+
+    assert generations.find_one({"_id": "active"}) == pointer_before
+    assert projector.active_generation() == first
 
 
 def test__stage__rejects_duplicate_or_nonstructural_chunks() -> None:
@@ -327,6 +377,7 @@ def test__activate__reverifies_staged_documents_fail_closed() -> None:
         projector.activate(
             generation=generation,
             expected_active_generation_id=None,
+            expected_active_pointer_revision=None,
         )
 
 
@@ -348,4 +399,5 @@ def test__activate__rejects_generation_metadata_drift() -> None:
         projector.activate(
             generation=generation,
             expected_active_generation_id=None,
+            expected_active_pointer_revision=None,
         )

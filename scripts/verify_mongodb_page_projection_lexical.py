@@ -255,11 +255,13 @@ def _verify(*, arguments: _Arguments, connection_uri: str) -> dict[str, object]:
             or generation.total_document_length != 4
         ):
             raise _VerificationError("generation measures differ")
-        active = projector.active_generation()
+        active_snapshot = projector.active_snapshot()
+        active = active_snapshot.generation
         if active is None:
             activated = projector.activate(
                 generation=generation,
                 expected_active_generation_id=None,
+                expected_active_pointer_revision=None,
             )
         elif active.generation_id == generation.generation_id:
             # ``stage`` has just fully reverified immutable content; avoiding a
@@ -269,6 +271,9 @@ def _verify(*, arguments: _Arguments, connection_uri: str) -> dict[str, object]:
             activated = projector.activate(
                 generation=generation,
                 expected_active_generation_id=active.generation_id,
+                expected_active_pointer_revision=(
+                    active_snapshot.pointer_revision
+                ),
             )
         if activated != generation:
             raise _VerificationError("active generation differs")

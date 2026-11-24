@@ -34,8 +34,9 @@ classDiagram
     class MongoPageProjectionLexicalProjector {
         +ensure_indexes()
         +stage(chunks) PageProjectionLexicalGeneration
-        +activate(generation, expected_active_generation_id)
-        +rebuild(chunks, expected_active_generation_id)
+        +activate(generation, expected_active_generation_id, expected_active_pointer_revision)
+        +rebuild(chunks, expected_active_generation_id, expected_active_pointer_revision)
+        +active_snapshot()
         +active_generation()
     }
     class MongoPageProjectionLexicalRetriever {
@@ -82,13 +83,81 @@ is required.
 ## Atomic activation
 
 Activation first requires exact ready metadata and repeats complete content
-verification. First activation inserts the singleton `_id = "active"` pointer;
-a concurrent insert loses through `_id` uniqueness. Later activation reads the
-current revision and performs one `update_one` filtered by pointer ID, caller's
-expected generation ID, and revision, while incrementing the revision. A stale
-expectation or race matches no document and fails closed. Retrieval observes
-only this pointer and immutable generation scope. No collection rename/drop or
+verification. `active_snapshot()` reads one singleton pointer and returns its
+validated immutable generation together with that exact revision, or explicit
+absence for both. First activation requires the caller's explicit absent
+snapshot and inserts `_id = "active"`; a concurrent insert loses through `_id`
+uniqueness. Later activation requires the caller's previously observed
+`(generation_id, revision)` pair, reobserves both before the write, and performs
+one `update_one` filtered by pointer ID, that generation ID, and that same
+revision while incrementing the revision. A stale expectation, A→B→A sequence,
+or race matches no document and fails closed. Retrieval observes only this
+pointer and immutable generation scope. No collection rename/drop or
 multi-document transaction is used.
+
+## Current-schema corpus-union operator commands
+
+The repository owns two bounded development-only modules:
+`scripts.preflight_page_projection_lexical_admission` and
+`scripts.admit_page_projection_lexical_publication`. Both use Ingestion's exact
+pinned typed publication loader and Search's production chunker; neither decodes
+upstream publication JSON. The exact payload byte length and owner-native
+maximum payload ceiling remain distinct typed-load request fields: the ceiling
+must be at least the payload length and no greater than 1,000,000,000 bytes, and
+the pinned loader request identity binds it exactly. The command first chunks
+the complete typed projection without filtering. It then selects one explicit
+inclusive physical page-index window. The invocation binds the complete source page/chunk counts
+and source chunk inventory as well as the selected page range, canonical page,
+block, and enrichment inventory digests, selected chunk inventory and manifest,
+UTF-8 text-byte count, style/enrichment counts, and a derived
+`page-projection-chunk-selection` identity. A complete publication uses its full
+physical range through the same contract. Text matching is never a selection
+mechanism. Missing, repeated, noncontiguous, or out-of-range pages; incomplete
+enrichment coverage; or any source/selection inventory drift fails before a
+Mongo client is created.
+
+The preflight is read-only: it reconstructs the complete active corpus, verifies
+every stored chunk, derives the deterministic union generation, and reports the
+expected active generation and pointer revision. The admission command requires
+those exact values plus the expected union generation, rederives all evidence,
+reobserves the pointer before staging, stages one immutable union, and activates
+only through the revision-bound CAS.
+
+An already-active identical union is a verified replay and does not increment
+the pointer. Every success then replays immutable staging in reverse input
+order, requires the active snapshot to remain unchanged, performs deterministic
+retrieval twice, and emits full opaque provenance locators without chunk text.
+Both commands hard-allow only the private development database, storage target,
+capability identity, and inherited anonymous-pipe descriptor FD 3. The URI is
+read through EOF once, bounded to 8,192 bytes, rejected on surrounding
+whitespace or control characters, closed immediately, and never accepted via
+argv, environment, file, or output. Output is one canonical redacted JSON line
+bounded to 65,536 bytes.
+
+The preflight success record has exact keys `status`, `phase`, fixed target and
+schema identities, typed-load/chunking/publication and physical-window selection
+identities, exact source and selected page/chunk/enrichment/style/text-byte
+measures and inventory digests, active generation/corpus/index/manifest and
+pointer-revision fields, bounded per-projection counts, added/overlap
+counts, complete prospective union identities and measures, and a derived
+`preflight_id`. Active fields are nullable only when `active_state` is exactly
+`absent`.
+
+The admission success record has exact keys `status`, `phase`, `disposition`,
+fixed target and schema identities, publication/load/chunking/projection and
+physical-window selection identities, before/after generation and revision,
+pointer-change evidence,
+preserved/added/overlap/union counts, complete union generation/corpus/index
+identities and measures, before/after per-projection counts, replay generation
+and revision, deterministic retrieval/replay result identities, request
+identity, bounded full locator records, and a derived `admission_result_id`.
+Locator records contain ranking evidence and opaque native provenance plus text
+digest/length, never text.
+
+Every handled failure has only `status = failed`, exact `phase`, `category`, and
+`exit_code`. Exit categories are 2/invocation, 3/owner-load, 4/inventory,
+5/connection, 6/state, 7/CAS, 8/retrieval, 9/unexpected, and 10/output.
+Preflight cannot emit CAS or retrieval failures because it performs neither.
 
 ## Bounded deterministic retrieval
 
