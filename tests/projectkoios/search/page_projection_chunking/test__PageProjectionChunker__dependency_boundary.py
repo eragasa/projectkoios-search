@@ -1,8 +1,9 @@
 """Dependency-boundary tests for :class:`PageProjectionChunker`.
 
 The production dependency is intentionally narrower than the package metadata:
-only the chunk-derivation leaf may import Ingestion, while Search indexing,
-retrieval, and the package facade remain import-independent.
+the chunk-derivation leaf and authority-admission module may import only their
+exact public Ingestion leaves, while other Search modules and the package facade
+remain import-independent.
 """
 
 from __future__ import annotations
@@ -13,7 +14,14 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 SOURCE_ROOT = REPOSITORY_ROOT / "src/python/projectkoios"
 CHUNKING_MODULE = SOURCE_ROOT / "search/page_projection_chunking.py"
+AUTHORITY_MODULE = SOURCE_ROOT / "search/authority_bound_evidence.py"
 EXACT_INGESTION_LEAF = "projectkoios.ingestion.page.projection.result"
+EXACT_ENRICHMENT_LEAVES = {
+    "projectkoios.ingestion.page.projection.enrichment.actionizer",
+    "projectkoios.ingestion.page.projection.enrichment.record",
+    "projectkoios.ingestion.page.projection.enrichment.request",
+    "projectkoios.ingestion.page.projection.enrichment.result",
+}
 
 
 def _imports(path: Path) -> tuple[str, ...]:
@@ -59,8 +67,20 @@ def test__dependency_boundary__imports_only_exact_ingestion_leaf() -> None:
     assert ingestion_imports == (EXACT_INGESTION_LEAF,)
 
 
+def test__dependency_boundary__authority_uses_public_enrichment_leaf() -> None:
+    """Allow authority admission to import only public enrichment modules."""
+
+    ingestion_imports = {
+        value
+        for value in _imports(AUTHORITY_MODULE)
+        if value.startswith("projectkoios.ingestion")
+    }
+
+    assert ingestion_imports == EXACT_ENRICHMENT_LEAVES
+
+
 def test__dependency_boundary__keeps_other_search_modules_independent() -> None:
-    """Reject Ingestion imports outside the authorized chunking leaf.
+    """Reject Ingestion imports outside the two authorized modules.
 
     Notes
     -----
@@ -70,7 +90,7 @@ def test__dependency_boundary__keeps_other_search_modules_independent() -> None:
 
     violations: list[str] = []
     for path in sorted(SOURCE_ROOT.rglob("*.py")):
-        if path == CHUNKING_MODULE:
+        if path in {CHUNKING_MODULE, AUTHORITY_MODULE}:
             continue
         if any(
             value.startswith("projectkoios.ingestion")

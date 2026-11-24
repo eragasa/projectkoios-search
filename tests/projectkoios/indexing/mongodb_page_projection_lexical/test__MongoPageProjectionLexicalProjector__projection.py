@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import replace
 from typing import cast
 
@@ -41,7 +42,7 @@ def _database(name: str) -> Database[MongoDocument]:
     """
 
     client: mongomock.MongoClient[MongoDocument] = mongomock.MongoClient()
-    return cast(Database[MongoDocument], client[name])
+    return client[name]
 
 
 def _chunks() -> tuple[PageProjectionChunk, ...]:
@@ -94,7 +95,9 @@ def test__ensure_indexes__uses_strict_pymongo_list_contract(
     """Pass lists and both exact unique definitions to the driver boundary."""
 
     observed: list[tuple[str, bool, tuple[tuple[str, object], ...]]] = []
-    original = MongoMockCollection.create_indexes
+    original = cast(
+        Callable[..., list[str]], MongoMockCollection.create_indexes
+    )
 
     def strict_create_indexes(
         self: MongoMockCollection,
@@ -145,7 +148,7 @@ def test__stage__uses_strict_pymongo_bulk_write_list_contract(
     """Pass exact ordered UpdateOne lists to every bulk-write boundary."""
 
     observed: list[tuple[UpdateOne, ...]] = []
-    original = MongoMockCollection.bulk_write
+    original = cast(Callable[..., object], MongoMockCollection.bulk_write)
 
     def strict_bulk_write(
         self: MongoMockCollection,

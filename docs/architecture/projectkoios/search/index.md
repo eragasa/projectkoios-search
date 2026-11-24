@@ -11,7 +11,8 @@ at their defining modules without aliases or conversion paths.
 |---|---|---|
 | [`page_projection_chunking`](page_projection_chunking/index.md) | Pure deterministic block-local chunks from exact Ingestion page projection | Upstream source-chunk derivation only; no indexing or retrieval import |
 | [`page_projection_lexical`](page_projection_lexical/index.md) | Backend-neutral structural chunk input, tokenizer, immutable lexical identities, and bounded request/results | Consumed by persistent lexical adapters; imports neither Ingestion nor concrete chunking |
-| [`evidence_retrieval`](evidence_retrieval/index.md) | Bounded text-only authoring evidence and deterministic lexical retrieval | Canonical independent family |
+| [`evidence_retrieval`](evidence_retrieval/index.md) | Bounded text-only authoring evidence and deterministic lexical retrieval | Candidate-capable prototype/review family |
+| [`authority_bound_evidence`](authority_bound_evidence/index.md) | Exact A+B+C admission and accepted-authority lexical retrieval | Production manuscript-authoring boundary |
 | [`literature`](literature/index.md) | Literature-review records, bundling, protocol, and SQLite FTS adapter | Independent prototype family |
 | [`models`](models/index.md) | Chunk results, retrieval purposes, roles, admissions, requests, and results | Independent prototype records; not authoring source evidence |
 | [`protocols`](protocols/index.md) | Unscoped and role-scoped index interfaces | Consumes `models` |
@@ -19,9 +20,9 @@ at their defining modules without aliases or conversion paths.
 
 Removing or adapting an existing surface requires a coordinated consumer
 migration. The authoring family provides no compatibility aliases or adapters.
-The page-projection chunking leaf is imported directly rather than re-exported
-by the package initializer, so importing indexing and retrieval modules does not
-load Ingestion.
+The page-projection chunking and authority-admission leaves are imported
+directly rather than re-exported by the package initializer. Importing unrelated
+indexing and retrieval modules therefore does not load Ingestion or References.
 
 ## Contents
 
@@ -29,7 +30,8 @@ load Ingestion.
 - [`implementation.md`](implementation.md) — facade, exports, and dependency rules.
 - [`page_projection_chunking`](page_projection_chunking/index.md) — exact page-projection chunk derivation.
 - [`page_projection_lexical`](page_projection_lexical/index.md) — backend-neutral lexical contracts and deterministic identities.
-- [`evidence_retrieval`](evidence_retrieval/index.md) — canonical authoring evidence implementation.
+- [`evidence_retrieval`](evidence_retrieval/index.md) — candidate-capable authoring evidence implementation.
+- [`authority_bound_evidence`](authority_bound_evidence/index.md) — production accepted-authority admission and retrieval.
 - [`literature`](literature/index.md) — reference-only literature retrieval prototype.
 - [`models`](models/index.md) — shared prototype records and admission policy.
 - [`protocols`](protocols/index.md) — structural index boundaries.

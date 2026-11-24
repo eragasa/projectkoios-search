@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import cast
+from typing import TypedDict, cast
 
 import mongomock
 import pytest
@@ -32,9 +32,24 @@ from tests.projectkoios.search.page_projection_chunking.fixture.chunking import 
 MongoDocument = dict[str, object]
 
 
+class ChunkSelectionArguments(TypedDict):
+    chunking_result_id: str
+    source_chunk_inventory_id: str
+    chunk_inventory_id: str
+    physical_page_index_first: int
+    physical_page_index_last: int
+    page_inventory_sha256: str
+    block_identity_inventory_sha256: str
+    enrichment_identity_inventory_sha256: str
+    chunk_manifest_sha256: str
+    page_count: int
+    chunk_count: int
+    document_text_utf8_bytes: int
+
+
 def _database(name: str) -> Database[MongoDocument]:
     client: mongomock.MongoClient[MongoDocument] = mongomock.MongoClient()
-    return cast(Database[MongoDocument], client[name])
+    return client[name]
 
 
 def _arguments() -> admission.AdmissionArguments:
@@ -341,7 +356,7 @@ def test__load_document__binds_distinct_ceiling_to_owner_request_identity(
         def action(self, **_kwargs: object) -> None:
             raise StopAfterOwnerLoad
 
-    modules = {
+    modules: dict[str, dict[str, object]] = {
         "projectkoios.ingestion.artifact.managed.media.type": {
             "ManagedArtifactMediaType": str,
         },
@@ -406,7 +421,10 @@ def test__load_document__binds_distinct_ceiling_to_owner_request_identity(
     assert captured["maximum_payload_bytes"] == 1_000_000_000
     assert captured["expected_payload_byte_length"] == 116_343_576
     assert captured["publication_root"] == arguments.publication_root
-    assert captured["request"].request_id == request_id
+    request = cast(
+        FakePageProjectionPublicationLoadRequest, captured["request"]
+    )
+    assert request.request_id == request_id
 
 
 def test__union_plan__preserves_every_active_chunk_and_adds_target() -> None:
@@ -490,7 +508,7 @@ def test__run_admission__cas_mismatch_performs_no_stage_or_pointer_write(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client: mongomock.MongoClient[MongoDocument] = mongomock.MongoClient()
-    database = cast(Database[MongoDocument], client[admission.DATABASE_NAME])
+    database = client[admission.DATABASE_NAME]
     projector = MongoPageProjectionLexicalProjector(
         database=database,
         storage_target_id=admission.STORAGE_TARGET_ID,
@@ -549,7 +567,7 @@ def test__run_admission__activates_then_replays_without_pointer_increment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     client: mongomock.MongoClient[MongoDocument] = mongomock.MongoClient()
-    database = cast(Database[MongoDocument], client[admission.DATABASE_NAME])
+    database = client[admission.DATABASE_NAME]
     projector = MongoPageProjectionLexicalProjector(
         database=database,
         storage_target_id=admission.STORAGE_TARGET_ID,
@@ -765,7 +783,7 @@ def test__admission_record__rejects_pointer_aba_during_retrieval(
 
 
 def test__chunk_selection_identity_binds_window_and_all_inventories() -> None:
-    values = {
+    values: ChunkSelectionArguments = {
         "chunking_result_id": "page-projection-chunking-result:sha256:"
         + "1" * 64,
         "source_chunk_inventory_id": (
@@ -785,14 +803,14 @@ def test__chunk_selection_identity_binds_window_and_all_inventories() -> None:
         "document_text_utf8_bytes": 75_068,
     }
     identity = admission._chunk_selection_id(**values)
+    window_drift = values.copy()
+    window_drift["physical_page_index_last"] = 169
+    enrichment_drift = values.copy()
+    enrichment_drift["enrichment_identity_inventory_sha256"] = "8" * 64
 
     assert identity == admission._chunk_selection_id(**values)
-    assert identity != admission._chunk_selection_id(
-        **{**values, "physical_page_index_last": 169}
-    )
-    assert identity != admission._chunk_selection_id(
-        **{**values, "enrichment_identity_inventory_sha256": "8" * 64}
-    )
+    assert identity != admission._chunk_selection_id(**window_drift)
+    assert identity != admission._chunk_selection_id(**enrichment_drift)
 
 
 def test__source_and_selected_inventory_gate_accepts_only_all_pins() -> None:

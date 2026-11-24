@@ -766,7 +766,7 @@ def test__result__keeps_infrastructure_failure_distinct() -> None:
     )
 
     assert failure.outcome is EvidenceRetrievalOutcome.INFRASTRUCTURE_FAILURE
-    assert failure.outcome is not EvidenceRetrievalOutcome.INSUFFICIENT_EVIDENCE
+    assert failure.outcome.value == "INFRASTRUCTURE_FAILURE"
 
 
 def test__result__rejects_evidence_for_nonavailable_outcome() -> None:

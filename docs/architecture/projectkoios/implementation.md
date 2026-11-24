@@ -37,9 +37,11 @@ classDiagram
 ```
 
 Implementation modules import shared boundaries from their owning modules.
-Only `projectkoios.search.page_projection_chunking` imports the Ingestion-owned
-`PageProjectionResult`; Search indexing and retrieval modules remain independent
-of Ingestion. Mongo connection construction and authentication remain outside
+`projectkoios.search.page_projection_chunking` imports only the Ingestion-owned
+`PageProjectionResult`; `authority_bound_evidence` imports only the public
+page-projection enrichment leaf for production admission. Other Search modules
+and all Search indexing remain independent of Ingestion. Mongo connection
+construction and authentication remain outside
 the repository's adapter and enter only as an injected database capability.
 `projectkoios.search` and `projectkoios.indexing` use explicit initializers; the
 namespace root itself has no initializer or implementation behavior.
